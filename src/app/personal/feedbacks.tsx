@@ -26,6 +26,7 @@ export default function CoachFeedbacksScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const [replying, setReplying] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -42,6 +43,7 @@ export default function CoachFeedbacksScreen() {
     if (plainErr) console.warn('feedbacks load error:', plainErr.message);
 
     const list = (plain as any[]) ?? [];
+    setDebugInfo(`coach_id=${profile.id} • encontrados=${list.length}${plainErr ? ' • erro=' + plainErr.message : ''}`);
     // Fetch student names separately to avoid join issues.
     const studentIds = Array.from(new Set(list.map((r) => r.student_id).filter(Boolean)));
     const studentMap: Record<string, string> = {};
@@ -98,6 +100,7 @@ export default function CoachFeedbacksScreen() {
       </PhotoHero>
 
       <SectionHeader title="Recebidos" subtitle="Notificações de feedback dos seus alunos" />
+      {debugInfo ? <Text style={{ color: theme.textSecondary, fontSize: 11, marginBottom: 4 }}>{debugInfo}</Text> : null}
       {rows.length === 0 ? (
         <EmptyState icon="chatbox-ellipses-outline" title="Nenhum feedback" message="Quando alunos enviarem feedback, aparecerá aqui." />
       ) : (
