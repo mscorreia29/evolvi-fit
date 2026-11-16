@@ -14,7 +14,7 @@ import { useAuth } from '@/providers/auth-provider';
 export default function PersonalBlocked() {
   const router = useRouter();
   const theme = useTheme();
-  const { profile, trialDaysLeft, signOut } = useAuth();
+  const { profile, trialDaysLeft, blockReason, signOut } = useAuth();
 
   const rejected = profile?.status === 'rejected';
   const pending = profile?.status === 'pending';
@@ -29,9 +29,7 @@ export default function PersonalBlocked() {
     message = 'Sua conta foi rejeitada pelo administrador. Entre em contato para mais informações.';
   } else if (blocked) {
     title = 'Conta bloqueada';
-    message = profile?.block_reason
-      ? `Sua conta foi bloqueada: ${profile.block_reason}`
-      : 'Sua conta foi bloqueada pelo administrador. Entre em contato para mais informações.';
+    message = blockReason ?? 'Sua conta foi bloqueada pelo administrador. Entre em contato para mais informações.';
   } else if (expired) {
     title = 'Período de teste encerrado';
     message =

@@ -32,6 +32,10 @@ type AuthContextValue = {
   isTrialExpired: boolean;
   accountBlocked: boolean;
   trialDaysLeft: number | null;
+  hasAccess: boolean;
+  accessExpiresAt: string | null;
+  daysUntilExpiry: number | null;
+  blockReason: string | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (params: SignUpParams) => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -156,18 +160,48 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const isAdmin = profile?.role === 'admin';
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
+
+  // determine access for personal accounts
+  let hasAccess = true;
+  let accessExpiresAt: string | null = null;
+  let blockReason: string | null = null;
+  if (profile?.role === 'personal') {
+    if (profile.status === 'blocked' || profile.status === 'rejected' || profile.status === 'pending') {
+      hasAccess = false;
+      blockReason = profile.block_reason ?? (profile.status === 'rejected' ? 'Conta não aprovada.' : profile.status === 'pending' ? 'Conta pendente de aprovação.' : 'Acesso bloqueado.');
+    } else if (profile.status === 'trial') {
+      if (profile.trial_ends_at && new Date(profile.trial_ends_at).getTime() < now) {
+        hasAccess = false;
+        blockReason = 'Período de teste encerrado.';
+      } else {
+        accessExpiresAt = profile.trial_ends_at;
+      }
+    } else if (profile.status === 'approved') {
+      if (profile.paid_until && new Date(profile.paid_until).getTime() < now) {
+        hasAccess = false;
+        blockReason = 'Acesso expirado. Renove com o administrador.';
+      } else {
+        accessExpiresAt = profile.paid_until;
+      }
+    } else {
+      hasAccess = false;
+      blockReason = 'Conta sem acesso.';
+    }
+  }
+
   const isTrialExpired =
     profile?.role === 'personal' &&
     profile?.status === 'trial' &&
     !!profile.trial_ends_at &&
     new Date(profile.trial_ends_at).getTime() < now;
-  const accountBlocked =
-    profile?.status === 'rejected' ||
-    (profile?.role === 'personal' && profile?.status === 'trial' && isTrialExpired) ||
-    (profile?.role === 'personal' && profile?.status === 'pending');
+  const accountBlocked = !hasAccess;
   const trialDaysLeft =
     profile?.role === 'personal' && profile?.status === 'trial' && profile.trial_ends_at
       ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - now) / 86400000))
+      : null;
+  const daysUntilExpiry =
+    hasAccess && accessExpiresAt
+      ? Math.max(0, Math.ceil((new Date(accessExpiresAt).getTime() - now) / 86400000))
       : null;
 
   const value = useMemo(
@@ -179,12 +213,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isTrialExpired,
       accountBlocked,
       trialDaysLeft,
+      hasAccess,
+      accessExpiresAt,
+      daysUntilExpiry,
+      blockReason,
       signIn,
       signUp,
       signOut,
       refreshProfile,
     }),
-    [session, profile, loading, isAdmin, isTrialExpired, accountBlocked, trialDaysLeft, signIn, signUp, signOut, refreshProfile],
+    [session, profile, loading, isAdmin, isTrialExpired, accountBlocked, trialDaysLeft, hasAccess, accessExpiresAt, daysUntilExpiry, blockReason, signIn, signUp, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

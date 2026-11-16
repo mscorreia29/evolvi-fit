@@ -4,7 +4,7 @@ import { Loading } from '@/components/ui/loading';
 import { useAuth } from '@/providers/auth-provider';
 
 export default function Index() {
-  const { loading, session, profile } = useAuth();
+  const { loading, session, profile, hasAccess } = useAuth();
 
   if (loading) {
     return <Loading label="Carregando..." />;
@@ -22,12 +22,7 @@ export default function Index() {
     return <Redirect href={'/admin' as never} />;
   }
 
-  if (profile.role === 'personal' && (profile.status === 'rejected' || profile.status === 'pending' || profile.status === 'blocked')) {
-    return <Redirect href={'/personal/bloqueado' as never} />;
-  }
-
-  // eslint-disable-next-line react-hooks/purity
-  if (profile.role === 'personal' && profile.status === 'trial' && profile.trial_ends_at && new Date(profile.trial_ends_at).getTime() < Date.now()) {
+  if (profile.role === 'personal' && !hasAccess) {
     return <Redirect href={'/personal/bloqueado' as never} />;
   }
 

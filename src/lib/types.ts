@@ -36,6 +36,9 @@ export type Profile = {
   blocked_at: string | null;
   blocked_by: string | null;
   block_reason: string | null;
+  paid_until: string | null;
+  last_payment_at: string | null;
+  payment_notes: string | null;
   notes: string | null;
   created_at: string;
 };

@@ -110,6 +110,20 @@ export default function AdminPersonais() {
     await setStatus(p, 'trial', 7);
   }
 
+  async function handleGrantAccess(p: PersonalRow, days = 30) {
+    setActionId(p.id);
+    await supabase.rpc('admin_grant_access', { p_user_id: p.id, p_days: days, p_notes: null });
+    setActionId(null);
+    await load();
+  }
+
+  async function handleRevokeAccess(p: PersonalRow) {
+    setActionId(p.id);
+    await supabase.rpc('admin_revoke_access', { p_user_id: p.id, p_reason: 'Acesso expirado / não pago' });
+    setActionId(null);
+    await load();
+  }
+
   async function handleCreate() {
     if (!newName.trim() || !newEmail.trim() || newPassword.length < 6) {
       setCreateError('Preencha nome, email e senha (mín. 6 caracteres).');
@@ -199,11 +213,26 @@ export default function AdminPersonais() {
                     Teste até {new Date(p.trial_ends_at).toLocaleDateString('pt-BR')}
                   </Text>
                 ) : null}
+                {p.status === 'approved' && p.paid_until ? (
+                  <Text style={[styles.trial, { color: Brand.primary }]}>
+                    Acesso até {new Date(p.paid_until).toLocaleDateString('pt-BR')}
+                    {p.last_payment_at ? ` • pago em ${new Date(p.last_payment_at).toLocaleDateString('pt-BR')}` : ''}
+                  </Text>
+                ) : null}
+                {p.status === 'approved' && !p.paid_until ? (
+                  <Text style={[styles.trial, { color: Brand.success }]}>Acesso ilimitado</Text>
+                ) : null}
               </View>
               {statusBadge(p.status)}
             </View>
 
             <View style={styles.actions}>
+              <Button
+                title="Liberar 30 dias"
+                onPress={() => handleGrantAccess(p, 30)}
+                loading={actionId === p.id}
+                disabled={actionId !== null}
+              />
               {p.status !== 'approved' && p.status !== 'blocked' ? (
                 <Button
                   title="Aprovar"
@@ -250,6 +279,14 @@ export default function AdminPersonais() {
                   disabled={actionId !== null}
                 />
               )}
+              {p.status === 'approved' && p.paid_until ? (
+                <Button
+                  title="Revogar acesso"
+                  variant="danger"
+                  onPress={() => handleRevokeAccess(p)}
+                  disabled={actionId !== null}
+                />
+              ) : null}
             </View>
             {p.block_reason ? (
               <Text style={[styles.blockReason, { color: Brand.danger }]}>Motivo: {p.block_reason}</Text>

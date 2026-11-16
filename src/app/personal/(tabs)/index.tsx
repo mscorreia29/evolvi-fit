@@ -24,7 +24,7 @@ import { useAuth } from '@/providers/auth-provider';
 export default function PersonalDashboard() {
   const router = useRouter();
   const theme = useTheme();
-  const { profile, trialDaysLeft } = useAuth();
+  const { profile, trialDaysLeft, daysUntilExpiry, accessExpiresAt } = useAuth();
 
   const [students, setStudents] = useState<Profile[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -151,6 +151,15 @@ export default function PersonalDashboard() {
           <Ionicons name="time-outline" size={16} color={Brand.warning} />
           <Text style={[styles.trialBannerText, { color: Brand.warning }]}>
             Período de teste: {trialDaysLeft} dia(s) restante(s). Aguarde aprovação do administrador.
+          </Text>
+        </View>
+      ) : null}
+
+      {profile?.status === 'approved' && daysUntilExpiry != null && daysUntilExpiry <= 7 && accessExpiresAt ? (
+        <View style={[styles.trialBanner, { backgroundColor: Brand.warning + '22', borderColor: Brand.warning }]}>
+          <Ionicons name="time-outline" size={16} color={Brand.warning} />
+          <Text style={[styles.trialBannerText, { color: Brand.warning }]}>
+            Seu acesso vence em {daysUntilExpiry} dia(s) ({new Date(accessExpiresAt).toLocaleDateString('pt-BR')}). Renove com o administrador.
           </Text>
         </View>
       ) : null}
