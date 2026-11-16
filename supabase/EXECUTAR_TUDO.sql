@@ -1370,6 +1370,32 @@ grant execute on function public.admin_reset_user_password(uuid, text) to authen
 
 
 -- ============================================================
+-- ARQUIVO: supabase/upgrade_admin_v5.sql
+-- ============================================================
+
+-- Evolvi Fit - admin v5: visão geral expandida + auditoria
+-- Execute no SQL Editor do Supabase (idempotente). Requer upgrade_admin.sql.
+
+-- 1) Atualizar view admin_overview com mais métricas
+create or replace view public.admin_overview as
+select
+  (select count(*) from public.profiles where role = 'personal' and status = 'trial') as personals_trial,
+  (select count(*) from public.profiles where role = 'personal' and status = 'approved') as personals_approved,
+  (select count(*) from public.profiles where role = 'personal' and status = 'rejected') as personals_rejected,
+  (select count(*) from public.profiles where role = 'personal' and status = 'pending') as personals_pending,
+  (select count(*) from public.profiles where role = 'personal' and status = 'blocked') as personals_blocked,
+  (select count(*) from public.profiles where role = 'aluno') as alunos_total,
+  (select count(*) from public.profiles) as usuarios_total,
+  (select count(*) from public.payment_dues where status in ('pending', 'late')) as pending_dues_count,
+  (select coalesce(sum(amount), 0) from public.payment_dues where status in ('pending', 'late')) as pending_dues_amount,
+  (select count(*) from public.profiles where status = 'blocked') as blocked_count,
+  (select count(*) from public.admin_audit_log) as audit_count;
+
+grant select on public.admin_overview to authenticated;
+
+
+
+-- ============================================================
 -- ARQUIVO: supabase/upgrade_exercicio_video.sql
 -- ============================================================
 
@@ -1382,6 +1408,95 @@ alter table public.workout_exercises
   add column if not exists instructions text;
 
 grant select, insert, update, delete on public.workout_exercises to authenticated;
+
+
+
+-- ============================================================
+-- ARQUIVO: supabase/upgrade_aluno_v2.sql
+-- ============================================================
+
+-- Evolvi Fit - painel aluno v2: hidratação, refeições, XP e atividade diária
+-- Execute no SQL Editor do Supabase (idempotente).
+
+-- 1) Hidratação diária
+create table if not exists public.water_logs (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  log_date date not null,
+  amount_ml integer not null default 0,
+  goal_ml integer not null default 2500,
+  updated_at timestamptz not null default now(),
+  unique (student_id, log_date)
+);
+
+create index if not exists water_logs_student_idx on public.water_logs(student_id, log_date desc);
+
+alter table public.water_logs enable row level security;
+
+drop policy if exists water_logs_select on public.water_logs;
+create policy water_logs_select on public.water_logs
+for select to authenticated
+using (student_id = auth.uid() or public.is_coach_of(student_id));
+
+drop policy if exists water_logs_insert on public.water_logs;
+create policy water_logs_insert on public.water_logs
+for insert to authenticated
+with check (student_id = auth.uid());
+
+drop policy if exists water_logs_update on public.water_logs;
+create policy water_logs_update on public.water_logs
+for update to authenticated
+using (student_id = auth.uid())
+with check (student_id = auth.uid());
+
+grant select, insert, update on public.water_logs to authenticated;
+
+-- 2) Refeições registradas
+create table if not exists public.meal_logs (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  log_date date not null,
+  meal_name text not null,
+  calories integer,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists meal_logs_student_idx on public.meal_logs(student_id, log_date desc);
+
+alter table public.meal_logs enable row level security;
+
+drop policy if exists meal_logs_select on public.meal_logs;
+create policy meal_logs_select on public.meal_logs
+for select to authenticated
+using (student_id = auth.uid() or public.is_coach_of(student_id));
+
+drop policy if exists meal_logs_insert on public.meal_logs;
+create policy meal_logs_insert on public.meal_logs
+for insert to authenticated
+with check (student_id = auth.uid());
+
+drop policy if exists meal_logs_delete on public.meal_logs;
+create policy meal_logs_delete on public.meal_logs
+for delete to authenticated
+using (student_id = auth.uid());
+
+grant select, insert, delete on public.meal_logs to authenticated;
+
+-- 3) XP do aluno (gamificação)
+alter table public.profiles
+  add column if not exists xp integer not null default 0;
+
+-- 4) Meta de peso (já existe student_goals; adicionar target_value e current_value)
+alter table public.student_goals
+  add column if not exists target_value numeric;
+alter table public.student_goals
+  add column if not exists current_value numeric;
+alter table public.student_goals
+  add column if not exists unit text;
+
+-- 5) Configuração de metas de água/refeições por personal (opcional, default no app)
+-- (sem tabela extra; usa water_logs.goal_ml e contagem de refeições)
 
 
 

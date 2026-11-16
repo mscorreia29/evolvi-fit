@@ -24,6 +24,10 @@ type Overview = {
   personals_pending: number;
   alunos_total: number;
   usuarios_total: number;
+  pending_dues_count: number;
+  pending_dues_amount: number;
+  blocked_count: number;
+  audit_count: number;
 };
 
 export default function AdminDashboard() {
@@ -65,8 +69,13 @@ export default function AdminDashboard() {
     personals_approved: 0,
     personals_rejected: 0,
     personals_pending: 0,
+    personals_blocked: 0,
     alunos_total: 0,
     usuarios_total: 0,
+    pending_dues_count: 0,
+    pending_dues_amount: 0,
+    blocked_count: 0,
+    audit_count: 0,
   };
 
   return (
@@ -94,49 +103,55 @@ export default function AdminDashboard() {
           <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Em teste (7 dias)</Text>
         </Card>
         <Card style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Brand.danger }]}>{o.personals_rejected + o.personals_pending}</Text>
+          <Text style={[styles.statValue, { color: Brand.danger }]}>{o.personals_pending + o.personals_rejected}</Text>
           <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Pendentes/Rejeitados</Text>
+        </Card>
+        <Card style={styles.statCard}>
+          <Text style={[styles.statValue, { color: Brand.danger }]}>{o.blocked_count}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Bloqueados</Text>
         </Card>
         <Card style={styles.statCard}>
           <Text style={[styles.statValue, { color: Brand.success }]}>{o.alunos_total}</Text>
           <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Alunos</Text>
+        </Card>
+        <Card style={styles.statCard}>
+          <Text style={[styles.statValue, { color: Brand.warning }]}>R$ {Number(o.pending_dues_amount).toFixed(0)}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>A receber ({o.pending_dues_count})</Text>
         </Card>
       </View>
 
       <Card>
         <SectionHeader title="Ações rápidas" />
         <View style={styles.quickGrid}>
-          <Pressable
-            style={[styles.quickItem, { borderColor: theme.border }]}
-            onPress={() => router.push('/admin/personais' as never)}>
+          <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/admin/personais' as never)}>
             <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
               <Ionicons name="people-outline" size={20} color={Brand.primary} />
             </View>
             <Text style={[styles.quickText, { color: theme.text }]}>Gerenciar personais</Text>
           </Pressable>
-          <Pressable
-            style={[styles.quickItem, { borderColor: theme.border }]}
-            onPress={() => router.push('/admin/alunos' as never)}>
+          <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/admin/alunos' as never)}>
             <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
               <Ionicons name="school-outline" size={20} color={Brand.primary} />
             </View>
             <Text style={[styles.quickText, { color: theme.text }]}>Ver alunos</Text>
           </Pressable>
-          <Pressable
-            style={[styles.quickItem, { borderColor: theme.border }]}
-            onPress={() => router.push('/admin/pagamentos' as never)}>
+          <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/admin/pagamentos' as never)}>
             <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
               <Ionicons name="card-outline" size={20} color={Brand.primary} />
             </View>
             <Text style={[styles.quickText, { color: theme.text }]}>Pagamentos</Text>
           </Pressable>
-          <Pressable
-            style={[styles.quickItem, { borderColor: theme.border }]}
-            onPress={() => router.push('/admin/configuracoes' as never)}>
+          <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/admin/configuracoes' as never)}>
             <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
               <Ionicons name="settings-outline" size={20} color={Brand.primary} />
             </View>
             <Text style={[styles.quickText, { color: theme.text }]}>Configurações</Text>
+          </Pressable>
+          <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/admin/auditoria' as never)}>
+            <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
+              <Ionicons name="list-outline" size={20} color={Brand.primary} />
+            </View>
+            <Text style={[styles.quickText, { color: theme.text }]}>Auditoria</Text>
           </Pressable>
         </View>
       </Card>
@@ -152,8 +167,12 @@ export default function AdminDashboard() {
           <Badge label={String(o.personals_trial)} tone="warning" />
         </View>
         <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais rejeitados</Text>
-          <Badge label={String(o.personals_rejected)} tone="danger" />
+          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais bloqueados</Text>
+          <Badge label={String(o.blocked_count)} tone="danger" />
+        </View>
+        <View style={styles.row}>
+          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Ações registradas</Text>
+          <Badge label={String(o.audit_count)} tone="muted" />
         </View>
       </Card>
 

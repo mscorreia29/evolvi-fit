@@ -35,6 +35,8 @@ export default function PersonalDashboard() {
   const [openFeedbacks, setOpenFeedbacks] = useState(0);
   const [pendingDues, setPendingDues] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingDuesAmount, setPendingDuesAmount] = useState(0);
+  const [activeStudents, setActiveStudents] = useState(0);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -53,6 +55,7 @@ export default function PersonalDashboard() {
       { count: unreadCount },
       { count: feedbackCount },
       { count: dueCount },
+      { data: dueData },
     ] = await Promise.all([
       ids.length
         ? supabase.from('profiles').select('*').in('id', ids).order('full_name', { ascending: true })
@@ -85,6 +88,11 @@ export default function PersonalDashboard() {
         .select('id', { count: 'exact', head: true })
         .eq('coach_id', profile.id)
         .in('status', ['pending', 'late']),
+      supabase
+        .from('payment_dues')
+        .select('amount')
+        .eq('coach_id', profile.id)
+        .in('status', ['pending', 'late']),
     ]);
 
     const studentRows = (studentsData as Profile[]) ?? [];
@@ -96,6 +104,8 @@ export default function PersonalDashboard() {
     setUnreadMessages(unreadCount ?? 0);
     setOpenFeedbacks(feedbackCount ?? 0);
     setPendingDues(dueCount ?? 0);
+    setPendingDuesAmount((dueData as { amount: number | null }[] | null)?.reduce((s, d) => s + (d.amount ?? 0), 0) ?? 0);
+    setActiveStudents(new Set(sessionRows.filter((s) => new Date(s.performed_at).getTime() >= Date.now() - 7 * 24 * 60 * 60 * 1000).map((s) => s.student_id)).size);
     setWeek(buildWeek(sessionRows.map((s) => s.performed_at)));
     setWeekCutoff(Date.now() - 7 * 24 * 60 * 60 * 1000);
   }, [profile]);
@@ -272,6 +282,61 @@ export default function PersonalDashboard() {
             </View>
           </Card>
         )
+      ) : null}
+
+      <Card style={styles.featureCard}>
+        <SectionHeader title="Resumo da semana" subtitle="Sua atividade recente" />
+        <View style={styles.summaryGrid}>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: theme.text }]}>{weekCount}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>sessões</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: theme.text }]}>{activeStudents}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>alunos ativos</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: theme.text }]}>{students.length}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>alunos total</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: Brand.warning }]}>R$ {pendingDuesAmount.toFixed(0)}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>a receber</Text>
+          </View>
+        </View>
+      </Card>
+
+      {(unreadMessages > 0 || openFeedbacks > 0 || pendingDues > 0 || (profile?.status === 'approved' && daysUntilExpiry != null && daysUntilExpiry <= 7)) ? (
+        <Card style={styles.featureCard}>
+          <SectionHeader title="Alertas" subtitle="Itens que precisam de atenção" />
+          {unreadMessages > 0 ? (
+            <Pressable onPress={() => router.push('/personal/mensagens' as never)} style={styles.alertRow}>
+              <Ionicons name="chatbubbles" size={18} color={Brand.warning} />
+              <Text style={[styles.alertText, { color: theme.text }]}>{unreadMessages} mensagem(ns) não lida(s)</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
+          {openFeedbacks > 0 ? (
+            <Pressable onPress={() => router.push('/personal/feedbacks' as never)} style={styles.alertRow}>
+              <Ionicons name="chatbox-ellipses" size={18} color={Brand.warning} />
+              <Text style={[styles.alertText, { color: theme.text }]}>{openFeedbacks} feedback(s) aberto(s)</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
+          {pendingDues > 0 ? (
+            <Pressable onPress={() => router.push('/personal/financeiro' as never)} style={styles.alertRow}>
+              <Ionicons name="card" size={18} color={Brand.warning} />
+              <Text style={[styles.alertText, { color: theme.text }]}>{pendingDues} cobrança(s) pendente(s) • R$ {pendingDuesAmount.toFixed(2)}</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
+          {profile?.status === 'approved' && daysUntilExpiry != null && daysUntilExpiry <= 7 && accessExpiresAt ? (
+            <View style={styles.alertRow}>
+              <Ionicons name="time" size={18} color={Brand.danger} />
+              <Text style={[styles.alertText, { color: Brand.danger }]}>Seu acesso vence em {daysUntilExpiry} dia(s). Renove com o admin.</Text>
+            </View>
+          ) : null}
+        </Card>
       ) : null}
 
       <SectionHeader title="Comunicação e financeiro" subtitle="Alertas de alunos e cobranças" />
@@ -498,6 +563,12 @@ const styles = StyleSheet.create({
   featureCard: {
     gap: Spacing.three,
   },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  summaryItem: { flexBasis: '47%', flexGrow: 1, alignItems: 'center', gap: 2, paddingVertical: Spacing.two },
+  summaryValue: { fontSize: 20, fontWeight: '800' },
+  summaryLabel: { fontSize: 11, fontWeight: '600' },
+  alertRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 8 },
+  alertText: { flex: 1, fontSize: 13, fontWeight: '600' },
   chartFooter: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -24,6 +24,7 @@ export default function AdminAlunos() {
 
 
   const [alunos, setAlunos] = useState<Profile[]>([]);
+  const [coaches, setCoaches] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -33,7 +34,29 @@ export default function AdminAlunos() {
       .select('*')
       .eq('role', 'aluno')
       .order('created_at', { ascending: false });
-    setAlunos((data as Profile[]) ?? []);
+    const list = (data as Profile[]) ?? [];
+    setAlunos(list);
+
+    const ids = list.map((a) => a.id);
+    if (ids.length) {
+      const { data: links } = await supabase.from('coach_students').select('student_id, coach_id').in('student_id', ids);
+      const coachIds = Array.from(new Set((links ?? []).map((l: any) => l.coach_id)));
+      const { data: coachProfiles } = coachIds.length
+        ? await supabase.from('profiles').select('id, full_name').in('id', coachIds)
+        : { data: [] };
+      const coachMap: Record<string, string> = {};
+      const linkMap: Record<string, string> = {};
+      (links ?? []).forEach((l: any) => { linkMap[l.student_id] = l.coach_id; });
+      (coachProfiles as { id: string; full_name: string | null }[] | null)?.forEach((c) => {
+        coachMap[c.id] = c.full_name ?? 'Personal';
+      });
+      const result: Record<string, string> = {};
+      list.forEach((a) => {
+        const cid = linkMap[a.id];
+        if (cid) result[a.id] = coachMap[cid] ?? 'Personal';
+      });
+      setCoaches(result);
+    }
     setLoading(false);
   }, []);
 
@@ -80,7 +103,7 @@ export default function AdminAlunos() {
                   {a.email}
                 </Text>
                 <Text style={[styles.meta, { color: theme.textSecondary }]}>
-                  {new Date(a.created_at).toLocaleDateString('pt-BR')}
+                  Personal: {coaches[a.id] ?? '—'} • {new Date(a.created_at).toLocaleDateString('pt-BR')}
                 </Text>
               </View>
               <Badge label="Aluno" tone="muted" />
