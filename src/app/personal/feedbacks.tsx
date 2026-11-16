@@ -32,14 +32,26 @@ export default function CoachFeedbacksScreen() {
 
   const load = useCallback(async () => {
     if (!profile) return;
-    const { data, error } = await supabase
+    const { data: plain, error: plainErr } = await supabase
       .from('student_feedback')
-      .select('*, student:profiles!student_feedback_student_id_fkey(id, full_name)')
+      .select('*')
       .eq('coach_id', profile.id)
       .order('created_at', { ascending: false })
       .limit(80);
-    if (error) console.warn('feedbacks load error:', error.message);
-    setRows((data as any[]) ?? []);
+
+    if (plainErr) console.warn('feedbacks load error:', plainErr.message);
+
+    const list = (plain as any[]) ?? [];
+    // Fetch student names separately to avoid join issues.
+    const studentIds = Array.from(new Set(list.map((r) => r.student_id).filter(Boolean)));
+    const studentMap: Record<string, string> = {};
+    if (studentIds.length) {
+      const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', studentIds);
+      (profs as { id: string; full_name: string | null }[] | null)?.forEach((p) => {
+        studentMap[p.id] = p.full_name ?? 'Aluno';
+      });
+    }
+    setRows(list.map((r) => ({ ...r, student: { id: r.student_id, full_name: studentMap[r.student_id] ?? 'Aluno' } })));
   }, [profile]);
 
   useFocusEffect(
