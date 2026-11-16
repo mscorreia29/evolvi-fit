@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -15,13 +15,11 @@ import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import type { AdminSettings } from '@/lib/types';
-import { useAuth } from '@/providers/auth-provider';
-import { useFocusEffect } from 'expo-router';
+
 
 export default function AdminConfiguracoes() {
   const router = useRouter();
   const theme = useTheme();
-  const { profile } = useAuth();
 
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [trialDays, setTrialDays] = useState('7');

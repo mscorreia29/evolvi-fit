@@ -39,6 +39,26 @@ export type Profile = {
   paid_until: string | null;
   last_payment_at: string | null;
   payment_notes: string | null;
+  xp: number;
+  notes: string | null;
+  created_at: string;
+};
+
+export type WaterLog = {
+  id: string;
+  student_id: string;
+  log_date: string;
+  amount_ml: number;
+  goal_ml: number;
+  updated_at: string;
+};
+
+export type MealLog = {
+  id: string;
+  student_id: string;
+  log_date: string;
+  meal_name: string;
+  calories: number | null;
   notes: string | null;
   created_at: string;
 };
@@ -137,6 +157,9 @@ export type StudentGoal = {
   target_date: string | null;
   status: 'active' | 'done' | 'cancelled';
   progress: number;
+  target_value: number | null;
+  current_value: number | null;
+  unit: string | null;
   created_at: string;
 };
 
