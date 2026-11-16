@@ -2,7 +2,8 @@
 -- Execute no SQL Editor do Supabase (idempotente). Requer upgrade_admin.sql.
 
 -- 1) Atualizar view admin_overview com mais métricas
-create or replace view public.admin_overview as
+drop view if exists public.admin_overview;
+create view public.admin_overview as
 select
   (select count(*) from public.profiles where role = 'personal' and status = 'trial') as personals_trial,
   (select count(*) from public.profiles where role = 'personal' and status = 'approved') as personals_approved,
