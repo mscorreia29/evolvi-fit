@@ -163,8 +163,8 @@ export default function NewWorkoutScreen() {
             reps: exercise.reps ?? '',
             rest: exercise.rest_seconds != null ? String(exercise.rest_seconds) : '',
             exerciseId: exercise.exercise_id,
-            videoUrl: exercise.exercise?.video_url ?? null,
-            instructions: exercise.exercise?.instructions ?? null,
+            videoUrl: exercise.video_url ?? exercise.exercise?.video_url ?? null,
+            instructions: exercise.instructions ?? exercise.exercise?.instructions ?? null,
           })),
       }));
 
@@ -206,7 +206,7 @@ export default function NewWorkoutScreen() {
   function updateExercise(
     dayKey: number,
     exerciseKey: number,
-    field: 'name' | 'sets' | 'reps' | 'rest',
+    field: 'name' | 'sets' | 'reps' | 'rest' | 'videoUrl',
     value: string,
   ) {
     setDays((prev) =>
@@ -215,7 +215,9 @@ export default function NewWorkoutScreen() {
           ? {
               ...day,
               exercises: day.exercises.map((exercise) =>
-                exercise.key === exerciseKey ? { ...exercise, [field]: value } : exercise,
+                exercise.key === exerciseKey
+                  ? { ...exercise, [field === 'videoUrl' ? 'videoUrl' : field]: value }
+                  : exercise,
               ),
             }
           : day,
@@ -410,6 +412,7 @@ export default function NewWorkoutScreen() {
           sets: Number(exercise.sets) || null,
           reps: exercise.reps.trim() || null,
           rest_seconds: Number(exercise.rest) || null,
+          video_url: exercise.videoUrl?.trim() || null,
           order_index: index,
         }));
 
@@ -636,6 +639,15 @@ export default function NewWorkoutScreen() {
                   <Text style={[styles.videoText, { color: Brand.primary }]}>Ver vídeo</Text>
                 </Pressable>
               ) : null}
+
+              <TextField
+                label="URL do vídeo (opcional)"
+                value={exercise.videoUrl ?? ''}
+                onChangeText={(value) => updateExercise(day.key, exercise.key, 'videoUrl', value)}
+                placeholder="https://..."
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
 
               <View style={styles.row}>
                 <View style={styles.rowItem}>

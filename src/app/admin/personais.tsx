@@ -39,6 +39,13 @@ export default function AdminPersonais() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [accountModal, setAccountModal] = useState<PersonalRow | null>(null);
+  const [authInfo, setAuthInfo] = useState<{ email: string | null; email_confirmed_at: string | null; last_sign_in_at: string | null; created_at: string | null } | null>(null);
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountMsg, setAccountMsg] = useState<string | null>(null);
+  const [accountErr, setAccountErr] = useState<string | null>(null);
 
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -122,6 +129,72 @@ export default function AdminPersonais() {
     await supabase.rpc('admin_revoke_access', { p_user_id: p.id, p_reason: 'Acesso expirado / não pago' });
     setActionId(null);
     await load();
+  }
+
+  async function openAccountModal(p: PersonalRow) {
+    setAccountModal(p);
+    setNewEmailInput(p.email ?? '');
+    setNewPasswordInput('');
+    setAccountMsg(null);
+    setAccountErr(null);
+    setAuthInfo(null);
+    const { data } = await supabase.rpc('admin_get_auth_info', { p_user_id: p.id });
+    const row = Array.isArray(data) ? data[0] : data;
+    setAuthInfo((row as any) ?? null);
+  }
+
+  async function handleUpdateEmail() {
+    if (!accountModal || !newEmailInput.trim()) return;
+    setAccountBusy(true);
+    setAccountMsg(null);
+    setAccountErr(null);
+    const { error } = await supabase.rpc('admin_update_user_email', {
+      p_user_id: accountModal.id,
+      p_new_email: newEmailInput.trim(),
+    });
+    setAccountBusy(false);
+    if (error) {
+      setAccountErr('Não foi possível alterar o email. Verifique o SQL admin v4.');
+      return;
+    }
+    setAccountMsg('Email alterado com sucesso.');
+    await load();
+    setAccountModal({ ...accountModal, email: newEmailInput.trim() });
+  }
+
+  async function handleResetPassword() {
+    if (!accountModal || newPasswordInput.length < 6) {
+      setAccountErr('A senha precisa ter pelo menos 6 caracteres.');
+      return;
+    }
+    setAccountBusy(true);
+    setAccountMsg(null);
+    setAccountErr(null);
+    const { error } = await supabase.rpc('admin_reset_user_password', {
+      p_user_id: accountModal.id,
+      p_new_password: newPasswordInput,
+    });
+    setAccountBusy(false);
+    if (error) {
+      setAccountErr('Não foi possível redefinir a senha. Verifique o SQL admin v4.');
+      return;
+    }
+    setAccountMsg('Senha redefinida. Use a nova senha para entrar na conta do personal.');
+    setNewPasswordInput('');
+  }
+
+  async function handleSendResetEmail() {
+    if (!accountModal?.email) return;
+    setAccountBusy(true);
+    setAccountMsg(null);
+    setAccountErr(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(accountModal.email.trim().toLowerCase());
+    setAccountBusy(false);
+    if (error) {
+      setAccountErr(error.message);
+      return;
+    }
+    setAccountMsg('Link de redefinição enviado para o email do personal.');
   }
 
   async function handleCreate() {
@@ -228,6 +301,12 @@ export default function AdminPersonais() {
 
             <View style={styles.actions}>
               <Button
+                title="Conta"
+                variant="secondary"
+                onPress={() => openAccountModal(p)}
+                disabled={actionId !== null}
+              />
+              <Button
                 title="Liberar 30 dias"
                 onPress={() => handleGrantAccess(p, 30)}
                 loading={actionId === p.id}
@@ -313,6 +392,56 @@ export default function AdminPersonais() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={!!accountModal} transparent animationType="fade" onRequestClose={() => setAccountModal(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: theme.backgroundElement }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Conta do personal</Text>
+              <Pressable onPress={() => setAccountModal(null)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            {accountModal ? (
+              <>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Nome: {accountModal.full_name ?? '—'}</Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>
+                  Último acesso:{' '}
+                  {authInfo?.last_sign_in_at ? new Date(authInfo.last_sign_in_at).toLocaleString('pt-BR') : 'nunca'}
+                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>
+                  Email confirmado:{' '}
+                  {authInfo?.email_confirmed_at ? new Date(authInfo.email_confirmed_at).toLocaleDateString('pt-BR') : 'não'}
+                </Text>
+
+                <View style={styles.divider} />
+
+                <Text style={[styles.sectionLabel, { color: theme.text }]}>Alterar email</Text>
+                <TextField label="Novo email" value={newEmailInput} onChangeText={setNewEmailInput} autoCapitalize="none" keyboardType="email-address" />
+                <Button title="Salvar email" variant="secondary" onPress={handleUpdateEmail} loading={accountBusy} disabled={accountBusy} />
+
+                <View style={styles.divider} />
+
+                <Text style={[styles.sectionLabel, { color: theme.text }]}>Redefinir senha</Text>
+                <TextField label="Nova senha (mín. 6)" value={newPasswordInput} onChangeText={setNewPasswordInput} secureTextEntry />
+                <View style={styles.row}>
+                  <Button title="Redefinir senha" onPress={handleResetPassword} loading={accountBusy} disabled={accountBusy} />
+                  <Button title="Enviar link por email" variant="secondary" onPress={handleSendResetEmail} disabled={accountBusy} />
+                </View>
+
+                {accountErr ? <Text style={[styles.error, { color: Brand.danger }]}>{accountErr}</Text> : null}
+                {accountMsg ? <Text style={[styles.infoLine, { color: Brand.success }]}>{accountMsg}</Text> : null}
+
+                <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
+                  Para acessar a conta do personal, use o email e a nova senha definidos acima no login normal.
+                </Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
     </Screen>
   );
 }
@@ -411,6 +540,23 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   error: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: Spacing.two,
+  },
+  infoLine: {
     fontSize: 13,
     fontWeight: '600',
   },

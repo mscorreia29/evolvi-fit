@@ -424,18 +424,6 @@ export default function StudentProfileScreen() {
     return (data?.coach_id as string | undefined) ?? null;
   }
 
-  async function handleGoogleConnect() {
-    if (Platform.OS === 'web') {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) Alert.alert('Erro', error.message);
-    } else {
-      Alert.alert('Em breve', 'Login com Google estará disponível em breve.');
-    }
-  }
-
   async function handleSignOut() {
     await signOut();
     router.replace('/login');
@@ -637,14 +625,6 @@ export default function StudentProfileScreen() {
         {passwordError ? <Text style={[styles.error, { color: Brand.danger }]}>{passwordError}</Text> : null}
         {passwordMessage ? <Text style={[styles.info, { color: Brand.success }]}>{passwordMessage}</Text> : null}
         <Button title="Alterar senha" variant="secondary" onPress={handleChangePassword} loading={savingPassword} />
-      </Card>
-
-      <Card>
-        <SectionTitle icon="logo-google" title="Conta Google" />
-        <Text style={[styles.hint, { color: theme.textSecondary }]}>
-          Conecte para entrar com um toque, sem senha.
-        </Text>
-        <Button title="Conectar conta Google" variant="secondary" onPress={handleGoogleConnect} />
       </Card>
 
       <Card>

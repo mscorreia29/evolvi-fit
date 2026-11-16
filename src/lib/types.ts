@@ -61,6 +61,8 @@ export type WorkoutExercise = {
   reps: string | null;
   rest_seconds: number | null;
   notes: string | null;
+  video_url: string | null;
+  instructions: string | null;
   order_index: number;
   exercise?: Pick<Exercise, 'video_url' | 'instructions'> | null;
 };

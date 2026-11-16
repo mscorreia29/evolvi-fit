@@ -350,7 +350,7 @@ export default function StudentWorkoutScreen() {
                     </View>
 
                     {exercises.map((exercise) => {
-                      const videoUrl = exercise.exercise?.video_url ?? null;
+                      const videoUrl = exercise.video_url ?? exercise.exercise?.video_url ?? null;
                       const details = [
                         exercise.sets ? `${exercise.sets} séries` : null,
                         exercise.reps ? `${exercise.reps} reps` : null,

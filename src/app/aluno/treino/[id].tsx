@@ -378,7 +378,7 @@ export default function WorkoutSessionScreen() {
 
             {dayExercises.map((exercise, exerciseIndex) => {
               const isDone = !!done[exercise.id];
-              const videoUrl = exercise.exercise?.video_url ?? null;
+              const videoUrl = exercise.video_url ?? exercise.exercise?.video_url ?? null;
               const instructions = exercise.exercise?.instructions ?? null;
               const values = logs[exercise.id] ?? { sets: '', reps: '', weight: '' };
               const details = [
