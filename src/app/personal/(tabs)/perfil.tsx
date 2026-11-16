@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
@@ -14,6 +14,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { fetchCoachSettings, upsertCoachSettings } from '@/lib/engagement';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -54,6 +55,54 @@ export default function PersonalProfileScreen() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+
+  const [feedbackInterval, setFeedbackInterval] = useState('14');
+  const [paymentReminderDays, setPaymentReminderDays] = useState('3');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  const loadSettings = useCallback(async () => {
+    if (!profile) return;
+    const { settings } = await fetchCoachSettings(profile.id);
+    if (settings) {
+      setFeedbackInterval(String(settings.feedback_interval_days));
+      setPaymentReminderDays(String(settings.payment_reminder_days_before));
+    }
+  }, [profile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+    }, [loadSettings]),
+  );
+
+  async function handleSaveSettings() {
+    if (!profile) return;
+    const feedback = parseInt(feedbackInterval, 10);
+    const payment = parseInt(paymentReminderDays, 10);
+    if (!Number.isFinite(feedback) || feedback < 1 || feedback > 90) {
+      setSettingsError('Intervalo de feedback deve ser entre 1 e 90 dias.');
+      return;
+    }
+    if (!Number.isFinite(payment) || payment < 0 || payment > 30) {
+      setSettingsError('Lembrete de pagamento deve ser entre 0 e 30 dias.');
+      return;
+    }
+    setSettingsError(null);
+    setSettingsMessage(null);
+    setSavingSettings(true);
+    const { error } = await upsertCoachSettings(profile.id, {
+      feedback_interval_days: feedback,
+      payment_reminder_days_before: payment,
+    });
+    setSavingSettings(false);
+    if (error) {
+      setSettingsError('Não foi possível salvar. Execute o SQL de engajamento no Supabase.');
+      return;
+    }
+    setSettingsMessage('Configurações salvas.');
+  }
 
   async function handleSaveProfile() {
     if (!profile) return;
@@ -184,6 +233,28 @@ export default function PersonalProfileScreen() {
             <Text style={[styles.quickText, { color: theme.text }]}>Meus alunos</Text>
           </Pressable>
         </View>
+      </Card>
+
+      <Card>
+        <SectionTitle icon="settings-outline" title="Engajamento" />
+        <Text style={[styles.hint, { color: theme.textSecondary }]}>
+          Configure intervalos para acompanhar feedbacks e cobranças dos alunos.
+        </Text>
+        <TextField
+          label="Intervalo de feedback (dias)"
+          value={feedbackInterval}
+          onChangeText={setFeedbackInterval}
+          keyboardType="number-pad"
+        />
+        <TextField
+          label="Lembrete de pagamento (dias antes)"
+          value={paymentReminderDays}
+          onChangeText={setPaymentReminderDays}
+          keyboardType="number-pad"
+        />
+        {settingsError ? <Message tone="error">{settingsError}</Message> : null}
+        {settingsMessage ? <Message tone="success">{settingsMessage}</Message> : null}
+        <Button title="Salvar configurações" variant="secondary" onPress={handleSaveSettings} loading={savingSettings} />
       </Card>
 
       <Card>

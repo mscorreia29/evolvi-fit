@@ -11,15 +11,25 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { PhotoHero } from '@/components/ui/photo-hero';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeader } from '@/components/ui/section-header';
 import { WeeklyChart } from '@/components/ui/weekly-chart';
 import { Images } from '@/constants/images';
 import { Brand, Gradients, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  fetchStudentGoals,
+  fetchTodayChallengeLog,
+  fetchWeeklyCheckin,
+  getDailyChallenge,
+  getWeekStartDateString,
+  setChallengeCompleted,
+  upsertWeeklyCheckin,
+} from '@/lib/engagement';
 import { checkNewWorkouts } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
-import type { WorkoutWithDays } from '@/lib/types';
+import type { StudentGoal, WeeklyCheckin, WorkoutWithDays } from '@/lib/types';
 import { buildWeek, type WeeklyPoint } from '@/lib/week';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -33,15 +43,22 @@ export default function StudentWorkoutScreen() {
   const [weekCount, setWeekCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [goals, setGoals] = useState<StudentGoal[]>([]);
+  const [challengeDone, setChallengeDone] = useState(false);
+  const [challengeBusy, setChallengeBusy] = useState(false);
+  const [checkin, setCheckin] = useState<WeeklyCheckin | null>(null);
+  const [savingCheckin, setSavingCheckin] = useState(false);
   const [video, setVideo] = useState<{
     title: string;
     url: string;
     instructions?: string | null;
   } | null>(null);
 
+  const dailyChallenge = getDailyChallenge();
+
   const load = useCallback(async () => {
     if (!profile) return;
-    const [{ data, error }, { data: history }] = await Promise.all([
+    const [workoutsRes, historyRes, goalsRes, challengeRes, checkinRes] = await Promise.all([
       supabase
         .from('workouts')
         .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
@@ -54,18 +71,21 @@ export default function StudentWorkoutScreen() {
         .eq('student_id', profile.id)
         .order('performed_at', { ascending: false })
         .limit(120),
+      fetchStudentGoals(profile.id),
+      fetchTodayChallengeLog(profile.id, getDailyChallenge().key),
+      fetchWeeklyCheckin(profile.id),
     ]);
 
-    if (error) {
-      console.warn(error.message);
+    if (workoutsRes.error) {
+      console.warn(workoutsRes.error.message);
       setWorkouts([]);
-      return;
+    } else {
+      const list = (workoutsRes.data as unknown as WorkoutWithDays[]) ?? [];
+      setWorkouts(list);
+      await checkNewWorkouts(list.map((item) => item.id));
     }
 
-    const list = (data as unknown as WorkoutWithDays[]) ?? [];
-    setWorkouts(list);
-
-    const dates = ((history as { performed_at: string }[]) ?? []).map((item) => item.performed_at);
+    const dates = ((historyRes.data as { performed_at: string }[]) ?? []).map((item) => item.performed_at);
     const weekFromDates = buildWeek(dates);
     setWeek(weekFromDates);
     setWeekCount(weekFromDates.reduce((sum, day) => sum + day.value, 0));
@@ -81,7 +101,9 @@ export default function StudentWorkoutScreen() {
     }
     setStreak(count);
 
-    await checkNewWorkouts(list.map((item) => item.id));
+    setGoals(goalsRes.goals);
+    setChallengeDone(Boolean(challengeRes.log?.completed));
+    setCheckin(checkinRes.checkin);
   }, [profile]);
 
   useFocusEffect(
@@ -99,6 +121,25 @@ export default function StudentWorkoutScreen() {
   function startWorkout(workout: WorkoutWithDays) {
     router.push(`/aluno/treino/${workout.id}` as never);
   }
+
+  async function toggleChallenge() {
+    if (!profile || challengeBusy) return;
+    setChallengeBusy(true);
+    const next = !challengeDone;
+    const { error } = await setChallengeCompleted(profile.id, dailyChallenge.key, next);
+    setChallengeBusy(false);
+    if (!error) setChallengeDone(next);
+  }
+
+  async function handleCheckin(value: number) {
+    if (!profile || savingCheckin) return;
+    setSavingCheckin(true);
+    const { checkin: saved } = await upsertWeeklyCheckin(profile.id, { motivation: value }, getWeekStartDateString());
+    setSavingCheckin(false);
+    if (saved) setCheckin(saved);
+  }
+
+  const activeGoals = goals.filter((g) => g.status === 'active').slice(0, 3);
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'aluno';
   const totalExercises = workouts.reduce(
@@ -153,6 +194,91 @@ export default function StudentWorkoutScreen() {
       <Card style={styles.featureCard}>
         <SectionHeader title="Sua semana" subtitle={`${weekCount} treino(s) nos últimos 7 dias`} />
         <WeeklyChart data={week} />
+      </Card>
+
+      <Card style={styles.featureCard}>
+        <SectionHeader title="Desafio do dia" subtitle={dailyChallenge.title} />
+        <View style={styles.challengeRow}>
+          <View style={[styles.challengeIcon, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name={dailyChallenge.icon as any} size={22} color={Brand.primary} />
+          </View>
+          <View style={styles.challengeTexts}>
+            <Text style={[styles.challengeTitle, { color: theme.text }]}>{dailyChallenge.title}</Text>
+            <Text style={[styles.challengeDesc, { color: theme.textSecondary }]}>
+              {dailyChallenge.description}
+            </Text>
+          </View>
+        </View>
+        <Pressable
+          onPress={toggleChallenge}
+          disabled={challengeBusy}
+          style={[
+            styles.challengeBtn,
+            {
+              backgroundColor: challengeDone ? theme.successSoft : theme.primarySoft,
+              borderColor: challengeDone ? Brand.success : Brand.primary,
+            },
+          ]}>
+          <Ionicons
+            name={challengeDone ? 'checkmark-circle' : 'ellipse-outline'}
+            size={18}
+            color={challengeDone ? Brand.success : Brand.primary}
+          />
+          <Text style={{ color: challengeDone ? Brand.success : Brand.primary, fontWeight: '800' }}>
+            {challengeDone ? 'Concluído hoje' : 'Marcar como feito'}
+          </Text>
+        </Pressable>
+      </Card>
+
+      <Card style={styles.featureCard}>
+        <SectionHeader title="Minhas metas" subtitle={`${activeGoals.length} ativa(s)`} />
+        {activeGoals.length === 0 ? (
+          <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+            Seu personal ainda não definiu metas para você.
+          </Text>
+        ) : (
+          activeGoals.map((goal) => (
+            <View key={goal.id} style={styles.goalItem}>
+              <View style={styles.goalHeader}>
+                <Text style={[styles.goalTitle, { color: theme.text }]} numberOfLines={1}>
+                  {goal.title}
+                </Text>
+                <Text style={[styles.goalPct, { color: Brand.primary }]}>{goal.progress ?? 0}%</Text>
+              </View>
+              <ProgressBar value={(goal.progress ?? 0) / 100} />
+            </View>
+          ))
+        )}
+      </Card>
+
+      <Card style={styles.featureCard}>
+        <SectionHeader title="Check-in semanal" subtitle="Como está sua motivação?" />
+        <View style={styles.moodRow}>
+          {[1, 2, 3, 4, 5].map((v) => {
+            const selected = (checkin?.motivation ?? 0) === v;
+            const labels = ['😞', '😕', '😐', '🙂', '😄'];
+            return (
+              <Pressable
+                key={v}
+                onPress={() => handleCheckin(v)}
+                disabled={savingCheckin}
+                style={[
+                  styles.moodBtn,
+                  {
+                    borderColor: selected ? Brand.primary : theme.border,
+                    backgroundColor: selected ? theme.primarySoft : theme.backgroundElement,
+                  },
+                ]}>
+                <Text style={{ fontSize: 22 }}>{labels[v - 1]}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {checkin?.motivation ? (
+          <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+            Check-in registrado para esta semana.
+          </Text>
+        ) : null}
       </Card>
 
       <SectionHeader
@@ -390,6 +516,69 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  challengeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  challengeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  challengeTexts: {
+    flex: 1,
+    gap: 2,
+  },
+  challengeTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  challengeDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  challengeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  goalItem: {
+    gap: 6,
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  goalTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  goalPct: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  moodRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  moodBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
   },
   workoutCard: {
     gap: Spacing.three,

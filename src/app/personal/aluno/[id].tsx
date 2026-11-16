@@ -20,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
 import { PhotoHero } from '@/components/ui/photo-hero';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeader } from '@/components/ui/section-header';
 import { StatTile } from '@/components/ui/stat-tile';
@@ -27,15 +28,22 @@ import { TextField } from '@/components/ui/text-field';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  fetchRecentChallengeLogs,
+  fetchRecentCheckins,
+  updateStudentGoal,
+} from '@/lib/engagement';
 import { formatDate, formatDuration } from '@/lib/format';
 import type { AnamnesisAnswers } from '@/lib/invites';
 import { supabase } from '@/lib/supabase';
 import { resendStudentConfirmation, sendStudentPasswordReset } from '@/lib/students';
 import type {
   CoachNote,
+  DailyChallengeLog,
   PhysicalAssessment,
   Profile,
   StudentGoal,
+  WeeklyCheckin,
   Workout,
   WorkoutSessionWithDetails,
 } from '@/lib/types';
@@ -119,6 +127,8 @@ export default function StudentDetailScreen() {
   const [goals, setGoals] = useState<StudentGoal[]>([]);
   const [notes, setNotes] = useState<CoachNote[]>([]);
   const [sessions, setSessions] = useState<WorkoutSessionWithDetails[]>([]);
+  const [recentCheckins, setRecentCheckins] = useState<WeeklyCheckin[]>([]);
+  const [recentChallenges, setRecentChallenges] = useState<DailyChallengeLog[]>([]);
   const [totalSessions, setTotalSessions] = useState(0);
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [openSession, setOpenSession] = useState<string | null>(null);
@@ -169,6 +179,8 @@ export default function StudentDetailScreen() {
       { data: assessmentData },
       { data: goalsData },
       { data: notesData },
+      checkinsRes,
+      challengesRes,
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
       supabase
@@ -205,6 +217,8 @@ export default function StudentDetailScreen() {
         .eq('student_id', id)
         .order('created_at', { ascending: false })
         .limit(20),
+      fetchRecentCheckins(id, 4),
+      fetchRecentChallengeLogs(id, 7),
     ]);
 
     let sessionData = sessionResult.data;
@@ -220,6 +234,8 @@ export default function StudentDetailScreen() {
     setAssessments((assessmentData as PhysicalAssessment[]) ?? []);
     setGoals((goalsData as StudentGoal[]) ?? []);
     setNotes((notesData as CoachNote[]) ?? []);
+    setRecentCheckins(checkinsRes.checkins);
+    setRecentChallenges(challengesRes.logs);
     setTotalSessions(count ?? 0);
 
     const list = (sessionData as unknown as WorkoutSessionWithDetails[]) ?? [];
@@ -378,7 +394,13 @@ export default function StudentDetailScreen() {
 
   async function toggleGoal(goal: StudentGoal) {
     const next = goal.status === 'done' ? 'active' : 'done';
-    await supabase.from('student_goals').update({ status: next }).eq('id', goal.id);
+    await updateStudentGoal(goal.id, { status: next, progress: next === 'done' ? 100 : (goal.progress ?? 0) < 100 ? goal.progress ?? 0 : 0 });
+    await load();
+  }
+
+  async function changeGoalProgress(goal: StudentGoal, delta: number) {
+    const next = Math.max(0, Math.min(100, (goal.progress ?? 0) + delta));
+    await updateStudentGoal(goal.id, { progress: next });
     await load();
   }
 
@@ -695,7 +717,7 @@ export default function StudentDetailScreen() {
       </Card>
 
       <Card>
-        <SectionHeader title="Metas do aluno" subtitle="Objetivos e acompanhamento" />
+        <SectionHeader title="Metas do aluno" subtitle="Objetivos e progresso" />
         <View style={styles.inlineForm}>
           <View style={{ flex: 1 }}>
             <TextField
@@ -716,23 +738,38 @@ export default function StudentDetailScreen() {
         ) : (
           goals.map((goal) => {
             const done = goal.status === 'done';
+            const progress = goal.progress ?? (done ? 100 : 0);
             return (
               <View key={goal.id} style={[styles.goalRow, { borderColor: theme.border }]}>
-                <Pressable onPress={() => toggleGoal(goal)} style={styles.goalMain}>
+                <Pressable onPress={() => toggleGoal(goal)} hitSlop={8}>
                   <Ionicons
                     name={done ? 'checkmark-circle' : 'ellipse-outline'}
                     size={22}
                     color={done ? Brand.success : theme.textSecondary}
                   />
-                  <Text
-                    style={[
-                      styles.goalTitle,
-                      { color: theme.text },
-                      done && { textDecorationLine: 'line-through', color: theme.textSecondary },
-                    ]}>
-                    {goal.title}
-                  </Text>
                 </Pressable>
+                <View style={styles.goalBody}>
+                  <View style={styles.goalTop}>
+                    <Text
+                      style={[
+                        styles.goalTitle,
+                        { color: theme.text },
+                        done && { textDecorationLine: 'line-through', color: theme.textSecondary },
+                      ]}>
+                      {goal.title}
+                    </Text>
+                    <Text style={[styles.goalPct, { color: Brand.primary }]}>{progress}%</Text>
+                  </View>
+                  <ProgressBar value={progress / 100} />
+                  <View style={styles.goalActions}>
+                    <Pressable onPress={() => changeGoalProgress(goal, -10)} style={[styles.stepBtn, { borderColor: theme.border }]}>
+                      <Text style={{ color: theme.textSecondary, fontWeight: '700' }}>-10%</Text>
+                    </Pressable>
+                    <Pressable onPress={() => changeGoalProgress(goal, 10)} style={[styles.stepBtn, { borderColor: theme.border }]}>
+                      <Text style={{ color: theme.textSecondary, fontWeight: '700' }}>+10%</Text>
+                    </Pressable>
+                  </View>
+                </View>
                 <Pressable onPress={() => removeGoal(goal.id)} hitSlop={8}>
                   <Ionicons name="trash-outline" size={18} color={theme.textSecondary} />
                 </Pressable>
@@ -740,6 +777,36 @@ export default function StudentDetailScreen() {
             );
           })
         )}
+      </Card>
+
+      <Card>
+        <SectionHeader title="Engajamento" subtitle="Check-ins semanais e desafios" />
+        <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Check-ins recentes</Text>
+        {recentCheckins.length === 0 ? (
+          <Text style={[styles.meta, { color: theme.textSecondary }]}>Nenhum check-in ainda.</Text>
+        ) : (
+          recentCheckins.map((ci) => (
+            <View key={ci.id} style={[styles.checkinRow, { borderColor: theme.border }]}>
+              <Text style={[styles.checkinWeek, { color: theme.text }]}>
+                Semana {formatDate(ci.week_start)}
+              </Text>
+              <View style={styles.checkinBadges}>
+                <Badge label={`Motivação ${ci.motivation ?? '-'}/5`} tone="primary" />
+                {ci.notes ? <Text style={[styles.meta, { color: theme.textSecondary }]} numberOfLines={1}>{ci.notes}</Text> : null}
+              </View>
+            </View>
+          ))
+        )}
+        <Text style={[styles.subLabel, { color: theme.textSecondary, marginTop: Spacing.two }]}>
+          Desafios (últimos 7 dias)
+        </Text>
+        <View style={styles.challengeStats}>
+          <Badge
+            label={`${recentChallenges.filter((c) => c.completed).length} concluídos`}
+            tone="success"
+          />
+          <Badge label={`${recentChallenges.length} registros`} tone="muted" />
+        </View>
       </Card>
 
       <Card>
@@ -1235,21 +1302,62 @@ const styles = StyleSheet.create({
   },
   goalRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.two,
     paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  goalMain: {
+  goalBody: {
     flex: 1,
+    gap: 6,
+  },
+  goalTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Spacing.two,
   },
   goalTitle: {
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
+  },
+  goalPct: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  goalActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  stepBtn: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  checkinRow: {
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+  },
+  checkinWeek: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  checkinBadges: {
+    gap: 4,
+  },
+  challengeStats: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: Spacing.one,
   },
   noteRow: {
     flexDirection: 'row',
