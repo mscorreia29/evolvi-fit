@@ -32,12 +32,13 @@ export default function CoachFeedbacksScreen() {
 
   const load = useCallback(async () => {
     if (!profile) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('student_feedback')
-      .select('*, student:profiles!student_feedback_student_id_fkey(id, full_name, avatar_url)')
+      .select('*, student:profiles!student_feedback_student_id_fkey(id, full_name)')
       .eq('coach_id', profile.id)
       .order('created_at', { ascending: false })
       .limit(80);
+    if (error) console.warn('feedbacks load error:', error.message);
     setRows((data as any[]) ?? []);
   }, [profile]);
 
