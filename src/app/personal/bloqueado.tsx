@@ -18,6 +18,7 @@ export default function PersonalBlocked() {
 
   const rejected = profile?.status === 'rejected';
   const pending = profile?.status === 'pending';
+  const blocked = profile?.status === 'blocked';
   const expired = profile?.status === 'trial' && trialDaysLeft === 0;
 
   let title = 'Conta em análise';
@@ -26,6 +27,11 @@ export default function PersonalBlocked() {
   if (rejected) {
     title = 'Conta não aprovada';
     message = 'Sua conta foi rejeitada pelo administrador. Entre em contato para mais informações.';
+  } else if (blocked) {
+    title = 'Conta bloqueada';
+    message = profile?.block_reason
+      ? `Sua conta foi bloqueada: ${profile.block_reason}`
+      : 'Sua conta foi bloqueada pelo administrador. Entre em contato para mais informações.';
   } else if (expired) {
     title = 'Período de teste encerrado';
     message =

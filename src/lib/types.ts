@@ -1,6 +1,26 @@
 export type Role = 'admin' | 'personal' | 'aluno';
 
-export type AccountStatus = 'pending' | 'trial' | 'approved' | 'rejected';
+export type AccountStatus = 'pending' | 'trial' | 'approved' | 'rejected' | 'blocked';
+
+export type AdminSettings = {
+  id: number;
+  default_trial_days: number;
+  auto_block_expired_trials: boolean;
+  allow_self_signup: boolean;
+  max_students_per_personal: number | null;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export type AdminAuditLog = {
+  id: string;
+  admin_id: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
 
 export type Profile = {
   id: string;
@@ -13,6 +33,9 @@ export type Profile = {
   trial_ends_at: string | null;
   approved_at: string | null;
   approved_by: string | null;
+  blocked_at: string | null;
+  blocked_by: string | null;
+  block_reason: string | null;
   notes: string | null;
   created_at: string;
 };

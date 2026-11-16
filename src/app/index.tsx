@@ -22,7 +22,7 @@ export default function Index() {
     return <Redirect href={'/admin' as never} />;
   }
 
-  if (profile.role === 'personal' && (profile.status === 'rejected' || profile.status === 'pending')) {
+  if (profile.role === 'personal' && (profile.status === 'rejected' || profile.status === 'pending' || profile.status === 'blocked')) {
     return <Redirect href={'/personal/bloqueado' as never} />;
   }
 

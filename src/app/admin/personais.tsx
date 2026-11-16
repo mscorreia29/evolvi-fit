@@ -75,13 +75,18 @@ export default function AdminPersonais() {
     }, [load]),
   );
 
-  async function setStatus(p: PersonalRow, status: 'approved' | 'rejected' | 'trial', trialDays?: number) {
+  async function setStatus(p: PersonalRow, status: 'approved' | 'rejected' | 'trial' | 'blocked', trialDays?: number, reason?: string) {
     setActionId(p.id);
-    await supabase.rpc('admin_set_account_status', {
-      p_user_id: p.id,
-      p_status: status,
-      p_trial_days: trialDays ?? null,
-    });
+    if (status === 'blocked') {
+      await supabase.rpc('admin_block_account', { p_user_id: p.id, p_reason: reason ?? null });
+    } else if (p.status === 'blocked') {
+      await supabase.rpc('admin_unblock_account', { p_user_id: p.id });
+      if (status !== 'approved') {
+        await supabase.rpc('admin_set_account_status', { p_user_id: p.id, p_status: status, p_trial_days: trialDays ?? null });
+      }
+    } else {
+      await supabase.rpc('admin_set_account_status', { p_user_id: p.id, p_status: status, p_trial_days: trialDays ?? null });
+    }
     setActionId(null);
     await load();
   }
@@ -143,6 +148,7 @@ export default function AdminPersonais() {
     if (status === 'approved') return <Badge label="Aprovado" tone="success" />;
     if (status === 'trial') return <Badge label="Teste" tone="warning" />;
     if (status === 'rejected') return <Badge label="Rejeitado" tone="danger" />;
+    if (status === 'blocked') return <Badge label="Bloqueado" tone="danger" />;
     return <Badge label="Pendente" tone="muted" />;
   }
 
@@ -198,7 +204,7 @@ export default function AdminPersonais() {
             </View>
 
             <View style={styles.actions}>
-              {p.status !== 'approved' ? (
+              {p.status !== 'approved' && p.status !== 'blocked' ? (
                 <Button
                   title="Aprovar"
                   onPress={() => handleApprove(p)}
@@ -214,22 +220,40 @@ export default function AdminPersonais() {
                   disabled={actionId !== null}
                 />
               ) : null}
-              {p.status !== 'rejected' ? (
+              {p.status !== 'rejected' && p.status !== 'blocked' ? (
                 <Button
                   title="Rejeitar"
                   variant="danger"
                   onPress={() => handleReject(p)}
                   disabled={actionId !== null}
                 />
+              ) : null}
+              {p.status === 'blocked' ? (
+                <Button
+                  title="Desbloquear"
+                  variant="secondary"
+                  onPress={() => setStatus(p, 'approved')}
+                  disabled={actionId !== null}
+                />
               ) : (
                 <Button
-                  title="Reativar teste"
-                  variant="secondary"
-                  onPress={() => handleExtendTrial(p)}
+                  title="Bloquear"
+                  variant="danger"
+                  onPress={() => {
+                    if (Platform.OS === 'web') {
+                      const reason = window.prompt('Motivo do bloqueio (opcional):') ?? undefined;
+                      setStatus(p, 'blocked', undefined, reason || undefined);
+                    } else {
+                      setStatus(p, 'blocked');
+                    }
+                  }}
                   disabled={actionId !== null}
                 />
               )}
             </View>
+            {p.block_reason ? (
+              <Text style={[styles.blockReason, { color: Brand.danger }]}>Motivo: {p.block_reason}</Text>
+            ) : null}
             {actionId === p.id ? <ActivityIndicator size="small" color={Brand.primary} /> : null}
           </Card>
         ))
@@ -316,6 +340,10 @@ const styles = StyleSheet.create({
   trial: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  blockReason: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',

@@ -23,6 +23,8 @@ export default function AdminLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="personais" />
       <Stack.Screen name="alunos" />
+      <Stack.Screen name="pagamentos" />
+      <Stack.Screen name="configuracoes" />
     </Stack>
   );
 }

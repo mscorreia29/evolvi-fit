@@ -122,6 +122,22 @@ export default function AdminDashboard() {
             </View>
             <Text style={[styles.quickText, { color: theme.text }]}>Ver alunos</Text>
           </Pressable>
+          <Pressable
+            style={[styles.quickItem, { borderColor: theme.border }]}
+            onPress={() => router.push('/admin/pagamentos' as never)}>
+            <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
+              <Ionicons name="card-outline" size={20} color={Brand.primary} />
+            </View>
+            <Text style={[styles.quickText, { color: theme.text }]}>Pagamentos</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.quickItem, { borderColor: theme.border }]}
+            onPress={() => router.push('/admin/configuracoes' as never)}>
+            <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
+              <Ionicons name="settings-outline" size={20} color={Brand.primary} />
+            </View>
+            <Text style={[styles.quickText, { color: theme.text }]}>Configurações</Text>
+          </Pressable>
         </View>
       </Card>
 
