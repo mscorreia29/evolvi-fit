@@ -22,6 +22,7 @@ export default function PersonalLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="aluno/[id]" />
+      <Stack.Screen name="ajuda" />
       <Stack.Screen name="convites" />
       <Stack.Screen name="feedbacks" />
       <Stack.Screen name="financeiro" />

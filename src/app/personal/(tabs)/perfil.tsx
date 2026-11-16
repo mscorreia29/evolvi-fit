@@ -232,6 +232,10 @@ export default function PersonalProfileScreen() {
             <Ionicons name="people-outline" size={20} color={Brand.primary} />
             <Text style={[styles.quickText, { color: theme.text }]}>Meus alunos</Text>
           </Pressable>
+          <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/personal/ajuda' as never)}>
+            <Ionicons name="help-circle-outline" size={20} color={Brand.primary} />
+            <Text style={[styles.quickText, { color: theme.text }]}>Ajuda</Text>
+          </Pressable>
         </View>
       </Card>
 
