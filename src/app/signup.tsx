@@ -52,7 +52,7 @@ export default function SignUpScreen() {
     }
 
     if (result.needsConfirmation) {
-      setInfo('Conta criada! Confirme seu email para entrar.');
+      setInfo('Conta criada com 7 dias de teste! Confirme seu email para entrar.');
     }
   }
 

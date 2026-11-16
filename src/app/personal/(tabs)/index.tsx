@@ -24,7 +24,7 @@ import { useAuth } from '@/providers/auth-provider';
 export default function PersonalDashboard() {
   const router = useRouter();
   const theme = useTheme();
-  const { profile } = useAuth();
+  const { profile, trialDaysLeft } = useAuth();
 
   const [students, setStudents] = useState<Profile[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -145,6 +145,15 @@ export default function PersonalDashboard() {
         </View>
         <NotificationBell />
       </View>
+
+      {profile?.status === 'trial' && trialDaysLeft != null ? (
+        <View style={[styles.trialBanner, { backgroundColor: Brand.warning + '22', borderColor: Brand.warning }]}>
+          <Ionicons name="time-outline" size={16} color={Brand.warning} />
+          <Text style={[styles.trialBannerText, { color: Brand.warning }]}>
+            Período de teste: {trialDaysLeft} dia(s) restante(s). Aguarde aprovação do administrador.
+          </Text>
+        </View>
+      ) : null}
 
       <PhotoHero source={Images.coach} height={280} imagePosition="top" glowColor={Brand.primary}>
         <View style={styles.heroTop}>
@@ -378,6 +387,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  trialBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.two,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  trialBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
   },
   brandRow: {
     flexDirection: 'row',

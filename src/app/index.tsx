@@ -18,5 +18,18 @@ export default function Index() {
     return <Loading label="Carregando perfil..." />;
   }
 
+  if (profile.role === 'admin') {
+    return <Redirect href={'/admin' as never} />;
+  }
+
+  if (profile.role === 'personal' && (profile.status === 'rejected' || profile.status === 'pending')) {
+    return <Redirect href={'/personal/bloqueado' as never} />;
+  }
+
+  // eslint-disable-next-line react-hooks/purity
+  if (profile.role === 'personal' && profile.status === 'trial' && profile.trial_ends_at && new Date(profile.trial_ends_at).getTime() < Date.now()) {
+    return <Redirect href={'/personal/bloqueado' as never} />;
+  }
+
   return <Redirect href={profile.role === 'personal' ? '/personal' : '/aluno'} />;
 }

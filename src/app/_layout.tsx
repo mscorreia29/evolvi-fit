@@ -66,6 +66,7 @@ export default function RootLayout() {
           <Stack.Screen name="notificacoes" />
           <Stack.Screen name="personal" />
           <Stack.Screen name="aluno" />
+          <Stack.Screen name="admin" />
         </Stack>
       </ThemeProvider>
     </AuthProvider>

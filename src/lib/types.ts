@@ -1,4 +1,6 @@
-export type Role = 'personal' | 'aluno';
+export type Role = 'admin' | 'personal' | 'aluno';
+
+export type AccountStatus = 'pending' | 'trial' | 'approved' | 'rejected';
 
 export type Profile = {
   id: string;
@@ -7,6 +9,11 @@ export type Profile = {
   email: string | null;
   phone: string | null;
   birth_date: string | null;
+  status: AccountStatus;
+  trial_ends_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  notes: string | null;
   created_at: string;
 };
 

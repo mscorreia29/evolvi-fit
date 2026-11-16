@@ -28,6 +28,10 @@ type AuthContextValue = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  isAdmin: boolean;
+  isTrialExpired: boolean;
+  accountBlocked: boolean;
+  trialDaysLeft: number | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (params: SignUpParams) => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -149,17 +153,38 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfile(nextProfile);
   }, [session]);
 
+  const isAdmin = profile?.role === 'admin';
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  const isTrialExpired =
+    profile?.role === 'personal' &&
+    profile?.status === 'trial' &&
+    !!profile.trial_ends_at &&
+    new Date(profile.trial_ends_at).getTime() < now;
+  const accountBlocked =
+    profile?.status === 'rejected' ||
+    (profile?.role === 'personal' && profile?.status === 'trial' && isTrialExpired) ||
+    (profile?.role === 'personal' && profile?.status === 'pending');
+  const trialDaysLeft =
+    profile?.role === 'personal' && profile?.status === 'trial' && profile.trial_ends_at
+      ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - now) / 86400000))
+      : null;
+
   const value = useMemo(
     () => ({
       session,
       profile,
       loading,
+      isAdmin,
+      isTrialExpired,
+      accountBlocked,
+      trialDaysLeft,
       signIn,
       signUp,
       signOut,
       refreshProfile,
     }),
-    [session, profile, loading, signIn, signUp, signOut, refreshProfile],
+    [session, profile, loading, isAdmin, isTrialExpired, accountBlocked, trialDaysLeft, signIn, signUp, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
