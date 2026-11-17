@@ -13,7 +13,6 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeader } from '@/components/ui/section-header';
 import { TextField } from '@/components/ui/text-field';
-import { WeeklyChart } from '@/components/ui/weekly-chart';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -36,10 +35,19 @@ import {
 import { checkNewWorkouts } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import type { MealLog, StudentGoal, WaterLog, WeeklyCheckin, WorkoutWithDays } from '@/lib/types';
-import { buildWeek, type WeeklyPoint } from '@/lib/week';
+import { buildCalendarWeek, buildWeek, type CalendarDay, type WeeklyPoint } from '@/lib/week';
 import { useAuth } from '@/providers/auth-provider';
 
 type Mission = { id: string; title: string; desc: string; xp: number; done: boolean };
+
+function formatDuration(seconds: number) {
+  if (!seconds) return '—';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+}
 
 export default function StudentWorkoutScreen() {
   const router = useRouter();
@@ -48,6 +56,7 @@ export default function StudentWorkoutScreen() {
 
   const [workouts, setWorkouts] = useState<WorkoutWithDays[]>([]);
   const [week, setWeek] = useState<WeeklyPoint[]>([]);
+  const [calendar, setCalendar] = useState<CalendarDay[]>([]);
   const [weekCount, setWeekCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -62,7 +71,12 @@ export default function StudentWorkoutScreen() {
   const [mealName, setMealName] = useState('');
   const [mealBusy, setMealBusy] = useState(false);
 
-  const [weekActivity, setWeekActivity] = useState<{ sessions: { performed_at: string }[]; water: { log_date: string; amount_ml: number; goal_ml: number }[]; meals: { log_date: string }[] } | null>(null);
+  const [weekActivity, setWeekActivity] = useState<{
+    sessions: { id: string; performed_at: string; duration_seconds: number | null }[];
+    water: { log_date: string; amount_ml: number; goal_ml: number }[];
+    meals: { log_date: string; calories: number | null }[];
+    series: number;
+  } | null>(null);
 
   const dailyChallenge = getDailyChallenge();
 
@@ -95,6 +109,7 @@ export default function StudentWorkoutScreen() {
     const dates = ((historyRes.data as { performed_at: string }[]) ?? []).map((item) => item.performed_at);
     const weekFromDates = buildWeek(dates);
     setWeek(weekFromDates);
+    setCalendar(buildCalendarWeek(dates));
     setWeekCount(weekFromDates.reduce((sum, day) => sum + day.value, 0));
 
     setGoals(goalsRes.goals);
@@ -111,6 +126,10 @@ export default function StudentWorkoutScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  }
+
+  function startWorkout(workout: WorkoutWithDays) {
+    router.push(`/aluno/treino/${workout.id}` as never);
   }
 
   async function handleCheckin(value: number) {
@@ -152,9 +171,7 @@ export default function StudentWorkoutScreen() {
   const waterAmount = water?.amount_ml ?? 0;
   const waterGoal = water?.goal_ml ?? 2500;
   const waterPct = Math.min(1, waterAmount / waterGoal);
-  const mealsPct = Math.min(1, meals.length / 3);
   const todayWorkoutDone = weekCount > 0 && week[week.length - 1]?.value > 0;
-  const workoutPct = todayWorkoutDone ? 1 : 0;
 
   const missions: Mission[] = [
     { id: 'workout', title: 'Fazer o treino de hoje', desc: 'Vale mais XP', xp: 20, done: todayWorkoutDone },
@@ -164,12 +181,21 @@ export default function StudentWorkoutScreen() {
   const missionsDone = missions.filter((m) => m.done).length;
   const xpTotal = (profile as any)?.xp ?? 0;
 
-  // weekly summary
-  const weekWaterAvg = weekActivity
-    ? Math.round((weekActivity.water.reduce((s, w) => s + w.amount_ml, 0) / Math.max(1, weekActivity.water.length)) / 100) / 10
-    : 0;
-  const weekMealsCount = weekActivity?.meals.length ?? 0;
   const weekWorkoutsCount = weekActivity?.sessions.length ?? 0;
+  const weekSeconds = weekActivity?.sessions.reduce((sum, session) => sum + (session.duration_seconds ?? 0), 0) ?? 0;
+  const weekCalories = weekActivity?.meals.reduce((sum, meal) => sum + (meal.calories ?? 0), 0) ?? 0;
+  const weekSeries = weekActivity?.series ?? 0;
+  const monthLabel = calendar.length > 0
+    ? calendar[0].month === calendar[6].month
+      ? calendar[0].month
+      : `${calendar[0].month} / ${calendar[6].month}`
+    : '';
+  const todayWorkout = workouts[0] ?? null;
+  const todayExerciseTotal = (todayWorkout?.workout_days ?? []).reduce(
+    (sum, day) => sum + (day.workout_exercises?.length ?? 0),
+    0,
+  );
+  const nextWorkouts = workouts.slice(1, 4);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -212,6 +238,159 @@ export default function StudentWorkoutScreen() {
         </View>
       </PhotoHero>
 
+      <Card style={styles.featureCard}>
+        <View style={styles.calendarHeader}>
+          <Text style={[styles.calendarMonth, { color: theme.text }]}>{monthLabel}</Text>
+          <Text style={[styles.calendarHint, { color: theme.textSecondary }]}>SEMANA</Text>
+        </View>
+        <View style={styles.calendarRow}>
+          {calendar.map((day) => (
+            <View
+              key={day.key}
+              style={[
+                styles.calendarDay,
+                day.isToday && { backgroundColor: Brand.primary },
+              ]}>
+              <Text
+                style={[
+                  styles.calendarWeekday,
+                  { color: day.isToday ? '#FFFFFF' : theme.textSecondary },
+                ]}>
+                {day.weekday}
+              </Text>
+              <Text style={[styles.calendarDayNumber, { color: day.isToday ? '#FFFFFF' : theme.text }]}>
+                {day.day}
+              </Text>
+              <View
+                style={[
+                  styles.calendarDot,
+                  {
+                    backgroundColor: day.hasWorkout
+                      ? day.isToday
+                        ? '#FFFFFF'
+                        : Brand.primary
+                      : 'transparent',
+                  },
+                ]}
+              />
+            </View>
+          ))}
+        </View>
+      </Card>
+
+      <SectionHeader
+        title="Treino de hoje"
+        subtitle={todayWorkoutDone ? 'Concluído hoje' : 'Pronto para começar'}
+      />
+
+      <Card style={styles.todayCard}>
+        {todayWorkout ? (
+          <>
+            <View style={styles.todayHeader}>
+              <View style={[styles.todayBadge, { backgroundColor: theme.primarySoft }]}>
+                <Ionicons name="barbell" size={22} color={Brand.primary} />
+              </View>
+              <View style={styles.todayTitleBox}>
+                <Text style={[styles.todayName, { color: theme.text }]}>{todayWorkout.name}</Text>
+                <Text style={[styles.todayMeta, { color: theme.textSecondary }]}>
+                  {todayExerciseTotal} exercícios · 60 min
+                </Text>
+              </View>
+              {todayWorkoutDone ? <Badge label="FEITO" tone="success" /> : null}
+            </View>
+            <Button title="Iniciar treino" onPress={() => startWorkout(todayWorkout)} />
+            <Button
+              title="Treinar com um amigo"
+              variant="secondary"
+              onPress={() => router.push('/aluno/treinos' as never)}
+            />
+          </>
+        ) : (
+          <View style={styles.todayEmpty}>
+            <Ionicons name="barbell-outline" size={28} color={Brand.primary} />
+            <Text style={[styles.todayEmptyTitle, { color: theme.text }]}>Nenhum treino para hoje</Text>
+            <Text style={[styles.todayEmptyText, { color: theme.textSecondary }]}>
+              Seu personal ainda não montou sua rotina.
+            </Text>
+          </View>
+        )}
+      </Card>
+
+      <View style={styles.sectionRow}>
+        <SectionHeader title="Seu progresso esta semana" />
+        <Pressable onPress={() => router.push('/aluno/historico')} hitSlop={8}>
+          <Text style={[styles.sectionLink, { color: Brand.primary }]}>Ver tudo</Text>
+        </Pressable>
+      </View>
+
+      <Card style={styles.progressCard}>
+        <View style={styles.progressGrid}>
+          <View style={styles.progressMetric}>
+            <Text style={[styles.progressValue, { color: theme.text }]}>{weekWorkoutsCount}/5</Text>
+            <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>Treinos</Text>
+          </View>
+          <View style={styles.progressMetric}>
+            <Text style={[styles.progressValue, { color: theme.text }]}>{formatDuration(weekSeconds)}</Text>
+            <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>Tempo</Text>
+          </View>
+          <View style={styles.progressMetric}>
+            <Text style={[styles.progressValue, { color: theme.text }]}>
+              {weekCalories > 0 ? `${weekCalories} kcal` : '—'}
+            </Text>
+            <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>Calorias</Text>
+          </View>
+          <View style={styles.progressMetric}>
+            <Text style={[styles.progressValue, { color: theme.text }]}>
+              {weekSeries > 0 ? weekSeries : '—'}
+            </Text>
+            <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>Séries</Text>
+          </View>
+        </View>
+      </Card>
+
+      <View style={styles.sectionRow}>
+        <SectionHeader title="Próximos treinos" />
+        <Pressable onPress={() => router.push('/aluno/treinos' as never)} hitSlop={8}>
+          <Text style={[styles.sectionLink, { color: Brand.primary }]}>Ver todos</Text>
+        </Pressable>
+      </View>
+
+      {nextWorkouts.length === 0 ? (
+        <Card style={styles.featureCard}>
+          <Text style={[styles.emptyHint, { color: theme.textSecondary }]}>
+            Seus próximos treinos aparecem aqui.
+          </Text>
+        </Card>
+      ) : (
+        nextWorkouts.map((workout, index) => {
+          const days = [...(workout.workout_days ?? [])].sort((a, b) => a.order_index - b.order_index);
+          const exerciseTotal = days.reduce((sum, day) => sum + (day.workout_exercises?.length ?? 0), 0);
+          const label = days[0]?.label ?? String.fromCharCode(66 + index);
+          return (
+            <Pressable
+              key={workout.id}
+              onPress={() => startWorkout(workout)}
+              style={[styles.nextWorkout, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+              <View style={[styles.nextBadge, { backgroundColor: theme.primarySoft }]}>
+                <Text style={[styles.nextBadgeText, { color: Brand.primary }]}>{label}</Text>
+              </View>
+              <View style={styles.nextInfo}>
+                <Text style={[styles.nextStatus, { color: Brand.primary }]}>
+                  {index === 0 ? 'NA SEQUÊNCIA' : index === 1 ? 'DEPOIS' : 'TAMBÉM'}
+                </Text>
+                <Text style={[styles.nextName, { color: theme.text }]} numberOfLines={1}>
+                  {workout.name}
+                </Text>
+                <Text style={[styles.nextMeta, { color: theme.textSecondary }]}>
+                  {exerciseTotal} exercícios · 60 min
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+            </Pressable>
+          );
+        })
+      )}
+
       {activeGoals ? (
         <Card style={styles.featureCard}>
           <SectionHeader title="Progresso da meta" subtitle={activeGoals.title} />
@@ -250,25 +429,6 @@ export default function StudentWorkoutScreen() {
       ) : null}
 
       <Card style={styles.featureCard}>
-        <SectionHeader title="Sua atividade de hoje" />
-        <View style={styles.activityRow}>
-          <View style={styles.activityItem}>
-            <Text style={[styles.activityPct, { color: workoutPct >= 1 ? Brand.success : theme.text }]}>{Math.round(workoutPct * 100)}%</Text>
-            <Text style={[styles.activityLabel, { color: theme.textSecondary }]}>Treino</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <Text style={[styles.activityPct, { color: waterPct >= 1 ? Brand.success : theme.text }]}>{Math.round(waterPct * 100)}%</Text>
-            <Text style={[styles.activityLabel, { color: theme.textSecondary }]}>Água</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <Text style={[styles.activityPct, { color: mealsPct >= 1 ? Brand.success : theme.text }]}>{Math.round(mealsPct * 100)}%</Text>
-            <Text style={[styles.activityLabel, { color: theme.textSecondary }]}>Refeições</Text>
-          </View>
-        </View>
-        <WeeklyChart data={week} />
-      </Card>
-
-      <Card style={styles.featureCard}>
         <View style={styles.challengeHeader}>
           <View>
             <Text style={[styles.challengeTitle, { color: theme.text }]}>Desafio do dia</Text>
@@ -300,26 +460,6 @@ export default function StudentWorkoutScreen() {
             <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
           </Pressable>
         ))}
-      </Card>
-
-      <SectionHeader title="Treinos" subtitle="Plano montado pelo seu personal" />
-
-      <Card style={styles.workoutCard}>
-        <View style={styles.workoutHeader}>
-          <View style={styles.workoutTitleBox}>
-            <Text style={[styles.workoutName, { color: theme.text }]}>Seus treinos</Text>
-            <Text style={[styles.workoutMeta, { color: theme.textSecondary }]}>
-              {workouts.length} treino(s) ativo(s)
-            </Text>
-          </View>
-          <View style={[styles.workoutIcon, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name="barbell-outline" size={22} color={Brand.primary} />
-          </View>
-        </View>
-        <Text style={[styles.workoutHint, { color: theme.textSecondary }]}>
-          Veja as divisões, exercícios e observações de cada treino em um só lugar.
-        </Text>
-        <Button title="Abrir treinos" onPress={() => router.push('/aluno/treinos' as never)} />
       </Card>
 
       <Card style={styles.featureCard}>
@@ -362,28 +502,6 @@ export default function StudentWorkoutScreen() {
         </View>
       </Card>
 
-      <Card style={styles.featureCard}>
-        <SectionHeader title="Resumo da semana" subtitle="Detalhes" />
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{weekWorkoutsCount}/5</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>treinos</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{weekWaterAvg.toFixed(1)} L</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>média água</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{Math.round((weekMealsCount / Math.max(1, 7)) * 100)}%</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>refeições</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{weekCount}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>total</Text>
-          </View>
-        </View>
-      </Card>
-
       {!checkin?.motivation ? (
         <Card style={styles.featureCard}>
           <SectionHeader title="Sua atualização chegou" subtitle="Conta rapidinho como está sendo" />
@@ -422,6 +540,36 @@ const styles = StyleSheet.create({
   heroGreeting: { color: 'rgba(255, 255, 255, 0.82)', fontSize: 13, fontWeight: '600' },
   heroXp: { color: '#FFFFFF', fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   heroHint: { color: 'rgba(255, 255, 255, 0.85)', fontSize: 12, fontWeight: '600' },
+  calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  calendarMonth: { fontSize: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  calendarHint: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  calendarRow: { flexDirection: 'row', gap: 4 },
+  calendarDay: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 9, borderRadius: Radius.md },
+  calendarWeekday: { fontSize: 10, fontWeight: '700' },
+  calendarDayNumber: { fontSize: 15, fontWeight: '800' },
+  calendarDot: { width: 5, height: 5, borderRadius: Radius.full, marginTop: 1 },
+  todayCard: { gap: Spacing.two },
+  todayHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginBottom: Spacing.one },
+  todayBadge: { width: 46, height: 46, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+  todayTitleBox: { flex: 1, gap: 2 },
+  todayName: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  todayMeta: { fontSize: 12, fontWeight: '600' },
+  todayEmpty: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.three },
+  todayEmptyTitle: { fontSize: 15, fontWeight: '800' },
+  todayEmptyText: { fontSize: 13, textAlign: 'center' },
+  sectionLink: { fontSize: 12, fontWeight: '800' },
+  progressCard: { gap: Spacing.two },
+  progressGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  progressMetric: { flexBasis: '47%', flexGrow: 1, alignItems: 'center', gap: 3, paddingVertical: Spacing.two },
+  progressValue: { fontSize: 19, fontWeight: '800' },
+  progressLabel: { fontSize: 11, fontWeight: '600' },
+  nextWorkout: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three, borderRadius: Radius.lg, borderWidth: 1 },
+  nextBadge: { width: 42, height: 42, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+  nextBadgeText: { fontSize: 13, fontWeight: '800' },
+  nextInfo: { flex: 1, gap: 2 },
+  nextStatus: { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  nextName: { fontSize: 15, fontWeight: '800' },
+  nextMeta: { fontSize: 11, fontWeight: '600' },
   featureCard: { gap: Spacing.three },
   emptyCard: { alignItems: 'center', paddingVertical: Spacing.four },
   emptyIcon: { width: 52, height: 52, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },

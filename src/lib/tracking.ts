@@ -95,14 +95,31 @@ export async function fetchWeekActivity(studentId: string) {
   since.setDate(since.getDate() - 6);
   const sinceStr = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-${String(since.getDate()).padStart(2, '0')}`;
   const [sessionsRes, waterRes, mealsRes] = await Promise.all([
-    supabase.from('workout_sessions').select('performed_at').eq('student_id', studentId).gte('performed_at', sinceStr),
+    supabase
+      .from('workout_sessions')
+      .select('id, performed_at, duration_seconds')
+      .eq('student_id', studentId)
+      .gte('performed_at', sinceStr),
     supabase.from('water_logs').select('log_date, amount_ml, goal_ml').eq('student_id', studentId).gte('log_date', sinceStr),
-    supabase.from('meal_logs').select('log_date').eq('student_id', studentId).gte('log_date', sinceStr),
+    supabase.from('meal_logs').select('log_date, calories').eq('student_id', studentId).gte('log_date', sinceStr),
   ]);
+
+  const sessions = (sessionsRes.data as { id: string; performed_at: string; duration_seconds: number | null }[]) ?? [];
+  const sessionIds = sessions.map((session) => session.id);
+  const { data: setRows } = sessionIds.length > 0
+    ? await supabase.from('session_exercises').select('session_id, sets_done').in('session_id', sessionIds)
+    : { data: [] };
+
+  const series = ((setRows as { session_id: string; sets_done: number | null }[] | null) ?? []).reduce(
+    (sum, row) => sum + (row.sets_done ?? 0),
+    0,
+  );
+
   return {
-    sessions: (sessionsRes.data as { performed_at: string }[]) ?? [],
+    sessions,
     water: (waterRes.data as { log_date: string; amount_ml: number; goal_ml: number }[]) ?? [],
-    meals: (mealsRes.data as { log_date: string }[]) ?? [],
+    meals: (mealsRes.data as { log_date: string; calories: number | null }[]) ?? [],
+    series,
   };
 }
 
