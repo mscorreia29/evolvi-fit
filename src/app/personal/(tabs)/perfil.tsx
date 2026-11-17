@@ -15,6 +15,11 @@ import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchCoachSettings, upsertCoachSettings } from '@/lib/engagement';
+import {
+  getWebNotificationPermission,
+  requestWebNotificationPermission,
+  type WebNotificationPermission,
+} from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -43,6 +48,8 @@ type IllustrationKind =
   | 'ios-share'
   | 'ios-sheet'
   | 'ios-home'
+  | 'ios-allow'
+  | 'ios-settings'
   | 'android-menu'
   | 'android-install'
   | 'android-allow'
@@ -154,7 +161,7 @@ function GuideIllustration({ kind }: { kind: IllustrationKind }) {
     );
   }
 
-  if (kind === 'android-allow') {
+  if (kind === 'android-allow' || kind === 'ios-allow') {
     return (
       <View style={[styles.mockDialog, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
         <Ionicons name="notifications-outline" size={20} color={Brand.primary} />
@@ -172,22 +179,32 @@ function GuideIllustration({ kind }: { kind: IllustrationKind }) {
     );
   }
 
-  return (
-    <View style={[styles.mockSettings, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-      <View style={styles.mockSettingsRow}>
-        <Ionicons name="notifications-outline" size={15} color={Brand.primary} />
-        <Text style={[styles.mockSettingsText, { color: theme.text }]}>Notificações</Text>
-        <View style={[styles.mockToggle, { backgroundColor: Brand.primary }]}>
-          <View style={styles.mockToggleKnob} />
+  if (kind === 'android-settings' || kind === 'ios-settings') {
+    return (
+      <View style={[styles.mockSettings, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <View style={styles.mockSettingsRow}>
+          <Ionicons name="notifications-outline" size={15} color={Brand.primary} />
+          <Text style={[styles.mockSettingsText, { color: theme.text }]}>
+            {kind === 'ios-settings' ? 'Permitir Notificações' : 'Notificações'}
+          </Text>
+          <View style={[styles.mockToggle, { backgroundColor: Brand.primary }]}>
+            <View style={styles.mockToggleKnob} />
+          </View>
+        </View>
+        <View style={styles.mockSettingsRow}>
+          <Ionicons name="globe-outline" size={15} color={theme.textSecondary} />
+          <Text style={[styles.mockSettingsText, { color: theme.textSecondary }]}>
+            {kind === 'ios-settings' ? 'Evolvi Fit' : 'evolvi-fit.vercel.app'}
+          </Text>
+          <Text style={[styles.mockSettingsValue, { color: Brand.success }]}>
+            {kind === 'ios-settings' ? 'Ativado' : 'Permitido'}
+          </Text>
         </View>
       </View>
-      <View style={styles.mockSettingsRow}>
-        <Ionicons name="globe-outline" size={15} color={theme.textSecondary} />
-        <Text style={[styles.mockSettingsText, { color: theme.textSecondary }]}>evolvi-fit.vercel.app</Text>
-        <Text style={[styles.mockSettingsValue, { color: Brand.success }]}>Permitido</Text>
-      </View>
-    </View>
-  );
+    );
+  }
+
+  return null;
 }
 
 function InstallStep({
@@ -244,6 +261,9 @@ export default function PersonalProfileScreen() {
 
   const [installOpen, setInstallOpen] = useState(false);
   const [installPlatform, setInstallPlatform] = useState<InstallPlatform>('android');
+  const [notificationPermission, setNotificationPermission] = useState<WebNotificationPermission>(
+    () => getWebNotificationPermission(),
+  );
 
   const loadSettings = useCallback(async () => {
     if (!profile) return;
@@ -368,6 +388,20 @@ export default function PersonalProfileScreen() {
     await signOut();
     router.replace('/login');
   }
+
+  async function handleEnableNotifications() {
+    const result = await requestWebNotificationPermission();
+    setNotificationPermission(result);
+  }
+
+  const notificationHint =
+    notificationPermission === 'granted'
+      ? 'Permissão concedida neste dispositivo.'
+      : notificationPermission === 'denied'
+        ? 'Permissão bloqueada. Ative em Ajustes → Notificações → Evolvi Fit.'
+        : installPlatform === 'ios'
+          ? 'Abra pelo ícone da tela inicial e toque para permitir.'
+          : 'Toque para permitir avisos de treinos e mensagens.';
 
   return (
     <Screen>
@@ -519,6 +553,18 @@ export default function PersonalProfileScreen() {
                   description="Toque em Adicionar. O app aparece na tela inicial."
                   illustration="ios-home"
                 />
+                <InstallStep
+                  number={4}
+                  title="Permitir notificações"
+                  description="Abra o app pela tela inicial e toque em Permitir quando o pedido aparecer."
+                  illustration="ios-allow"
+                />
+                <InstallStep
+                  number={5}
+                  title="Se não aparecer o pedido"
+                  description="Vá em Ajustes → Notificações → Evolvi Fit e ative Permitir Notificações."
+                  illustration="ios-settings"
+                />
               </View>
             ) : (
               <View style={styles.installSteps}>
@@ -549,8 +595,28 @@ export default function PersonalProfileScreen() {
               </View>
             )}
 
+            {notificationPermission !== 'unsupported' ? (
+              <View style={[styles.notificationBox, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
+                <View style={styles.notificationBoxHeader}>
+                  <Ionicons name="notifications-outline" size={18} color={Brand.primary} />
+                  <View style={styles.notificationBoxTexts}>
+                    <Text style={[styles.notificationBoxTitle, { color: theme.text }]}>Ativar notificações</Text>
+                    <Text style={[styles.notificationBoxDescription, { color: theme.textSecondary }]}>
+                      {notificationHint}
+                    </Text>
+                  </View>
+                </View>
+                <Button
+                  title={notificationPermission === 'granted' ? 'Permitido' : 'Permitir notificações'}
+                  variant="secondary"
+                  disabled={notificationPermission === 'granted'}
+                  onPress={handleEnableNotifications}
+                />
+              </View>
+            ) : null}
+
             <Text style={[styles.installFooter, { color: theme.textSecondary }]}>
-              Depois de instalar, abra o app pelo ícone na tela inicial.
+              Depois de instalar, abra pelo ícone na tela inicial e permita notificações.
             </Text>
           </View>
         ) : null}
@@ -663,6 +729,29 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     textAlign: 'center',
+  },
+  notificationBox: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.two,
+    gap: Spacing.two,
+  },
+  notificationBoxHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+  },
+  notificationBoxTexts: {
+    flex: 1,
+    gap: 2,
+  },
+  notificationBoxTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  notificationBoxDescription: {
+    fontSize: 11,
+    lineHeight: 16,
   },
   mockWindow: {
     borderWidth: 1,

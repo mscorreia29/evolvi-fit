@@ -29,6 +29,29 @@ function supported() {
   return Platform.OS === 'android' || Platform.OS === 'ios';
 }
 
+export type WebNotificationPermission = 'unsupported' | 'default' | 'denied' | 'granted';
+
+type WebNotificationApi = {
+  permission: WebNotificationPermission;
+  requestPermission: () => Promise<WebNotificationPermission>;
+};
+
+function webNotification(): WebNotificationApi | null {
+  if (typeof window === 'undefined') return null;
+  return (window as unknown as { Notification?: WebNotificationApi }).Notification ?? null;
+}
+
+export function getWebNotificationPermission(): WebNotificationPermission {
+  return webNotification()?.permission ?? 'unsupported';
+}
+
+export async function requestWebNotificationPermission(): Promise<WebNotificationPermission> {
+  const api = webNotification();
+  if (!api) return 'unsupported';
+  if (api.permission === 'granted' || api.permission === 'denied') return api.permission;
+  return await api.requestPermission();
+}
+
 export async function ensureNotificationPermission() {
   if (!supported()) return false;
 
