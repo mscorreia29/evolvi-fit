@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   PanResponder,
   Platform,
   Pressable,
@@ -142,6 +143,7 @@ export default function WorkoutSessionScreen() {
     instructions?: string | null;
   } | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -240,6 +242,7 @@ export default function WorkoutSessionScreen() {
   const activeLog = activeExercise
     ? logs[activeExercise.id] ?? { sets: '', reps: '', weight: '' }
     : { sets: '', reps: '', weight: '' };
+  const isActiveDone = activeExercise ? !!done[activeExercise.id] : false;
 
   const elapsed = Math.floor((now - startedAt) / 1000);
   const restRemaining = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
@@ -290,22 +293,44 @@ export default function WorkoutSessionScreen() {
     [exercises.length],
   );
 
+  const slideToExercise = useCallback(
+    (direction: number) => {
+      const next = activeIndex + direction;
+      if (next < 0 || next >= exercises.length) return;
+
+      Animated.sequence([
+        Animated.timing(slideAnim, {
+          toValue: direction * -44,
+          duration: 110,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      goToExercise(next);
+    },
+    [activeIndex, exercises.length, goToExercise, slideAnim],
+  );
+
   const swipeResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_event, gesture) =>
-          Math.abs(gesture.dx) > 24 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+          Math.abs(gesture.dx) > 20 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4,
         onPanResponderRelease: (_event, gesture) => {
           if (
-            Math.abs(gesture.dx) < 48 ||
-            Math.abs(gesture.dx) < Math.abs(gesture.dy) * 1.5
+            Math.abs(gesture.dx) < 40 ||
+            Math.abs(gesture.dx) < Math.abs(gesture.dy) * 1.4
           ) {
             return;
           }
-          goToExercise(gesture.dx > 0 ? activeIndex - 1 : activeIndex + 1);
+          slideToExercise(gesture.dx > 0 ? -1 : 1);
         },
       }),
-    [activeIndex, goToExercise],
+    [slideToExercise],
   );
 
   function handleExit() {
@@ -628,8 +653,18 @@ export default function WorkoutSessionScreen() {
             })}
           </ScrollView>
 
-          <View {...swipeResponder.panHandlers} style={styles.swipeArea}>
-          <View style={styles.currentExerciseHeader}>
+          <Text style={[styles.swipeHint, { color: theme.textSecondary }]}>
+            Deslize para o lado para trocar de exercício
+          </Text>
+
+          <View {...swipeResponder.panHandlers} style={styles.exerciseCarousel}>
+            <Animated.View
+              style={[
+                styles.exerciseCarouselInner,
+                { transform: [{ translateX: slideAnim }] },
+              ]}>
+              <View style={styles.swipeArea}>
+                <View style={styles.currentExerciseHeader}>
             <View
               style={[
                 styles.currentIndex,
@@ -834,14 +869,38 @@ export default function WorkoutSessionScreen() {
                 </Pressable>
               ) : null}
             </View>
+
+            <View style={styles.completionActions}>
+              <Button
+                title={isActiveDone ? 'Exercício finalizado' : 'Finalizar exercício'}
+                variant={isActiveDone ? 'secondary' : 'primary'}
+                disabled={isActiveDone}
+                onPress={() => handleToggleDone(activeExercise)}
+                style={styles.completionButton}
+              />
+              {isActiveDone ? (
+                <Pressable
+                  onPress={() => handleToggleDone(activeExercise)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Desfazer conclusão do exercício"
+                  style={styles.undoButton}>
+                  <Ionicons name="arrow-undo-outline" size={14} color={theme.textSecondary} />
+                  <Text style={[styles.undoButtonText, { color: theme.textSecondary }]}>
+                    Desfazer
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </Card>
+            </Animated.View>
+          </View>
 
           <View style={styles.pagerControls}>
             <Button
               title="Anterior"
               variant="secondary"
               disabled={activeIndex === 0}
-              onPress={() => goToExercise(activeIndex - 1)}
+              onPress={() => slideToExercise(-1)}
               style={styles.pagerButton}
             />
             <Text style={[styles.pagerCount, { color: theme.textSecondary }]}>
@@ -851,7 +910,7 @@ export default function WorkoutSessionScreen() {
               title="Próximo"
               variant="secondary"
               disabled={activeIndex === exercises.length - 1}
-              onPress={() => goToExercise(activeIndex + 1)}
+              onPress={() => slideToExercise(1)}
               style={styles.pagerButton}
             />
           </View>
@@ -1033,6 +1092,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
+  swipeHint: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  exerciseCarousel: {
+    gap: Spacing.two,
+  },
+  exerciseCarouselInner: {
+    gap: Spacing.two,
+  },
   swipeArea: {
     gap: Spacing.two,
   },
@@ -1180,6 +1249,25 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  completionActions: {
+    gap: Spacing.one,
+  },
+  completionButton: {
+    minHeight: 46,
+  },
+  undoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 30,
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.two,
+  },
+  undoButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   error: {
     fontSize: 13,
