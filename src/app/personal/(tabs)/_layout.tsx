@@ -18,8 +18,10 @@ export default function PersonalTabsLayout() {
 
   return (
     <Tabs
+      detachInactiveScreens={false}
       screenOptions={{
         headerShown: false,
+        animation: 'none',
         tabBarActiveTintColor: Brand.primary,
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarHideOnKeyboard: true,
