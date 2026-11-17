@@ -30,7 +30,7 @@ type LogValues = {
 type FinishResult = {
   duration: number;
   calories: number;
-  volumeKg: number;
+  loadKg: number;
 };
 
 function firstNumber(value?: string | null) {
@@ -209,14 +209,10 @@ export default function WorkoutSessionScreen() {
     setError(null);
 
     const duration = Math.floor((Date.now() - startedAt) / 1000);
-    const volumeKg = exercises.reduce((total, exercise) => {
-      const values = logs[exercise.id];
-      const weight = firstNumber(values?.weight);
-      const sets = firstNumber(values?.sets);
-      const reps = firstNumber(values?.reps);
-      if (weight <= 0 || sets <= 0 || reps <= 0) return total;
-      return total + weight * sets * reps;
-    }, 0);
+    const loadKg = exercises.reduce(
+      (total, exercise) => total + Math.max(0, firstNumber(logs[exercise.id]?.weight)),
+      0,
+    );
     const calories = duration > 0
       ? Math.max(1, Math.round(6 * (bodyWeight ?? 70) * (duration / 3600)))
       : 0;
@@ -268,19 +264,19 @@ export default function WorkoutSessionScreen() {
     }
 
     setSaving(false);
-    setFinished({ duration, calories, volumeKg });
+    setFinished({ duration, calories, loadKg });
   }
 
   async function handleShareResult() {
     if (!finished) return;
 
-    const volume = Math.round(finished.volumeKg).toLocaleString('pt-BR');
+    const load = Math.round(finished.loadKg).toLocaleString('pt-BR');
     const message = [
       'Treino concluído no Evolvi Fit!',
       '',
       workout?.name ?? 'Treino',
       `Calorias: ${finished.calories} kcal`,
-      finished.volumeKg > 0 ? `Carga total: ${volume} kg` : null,
+      finished.loadKg > 0 ? `Carga total: ${load} kg` : null,
       `Tempo: ${formatDuration(finished.duration)}`,
       `${completedCount}/${exercises.length} exercícios concluídos`,
     ]
@@ -336,7 +332,7 @@ export default function WorkoutSessionScreen() {
 
   if (finished !== null) {
     const completion = exercises.length ? completedCount / exercises.length : 0;
-    const volume = Math.round(finished.volumeKg).toLocaleString('pt-BR');
+    const load = Math.round(finished.loadKg).toLocaleString('pt-BR');
 
     return (
       <Screen>
@@ -371,7 +367,7 @@ export default function WorkoutSessionScreen() {
                 <Ionicons name="barbell" size={20} color={Brand.accent} />
               </View>
               <Text style={[styles.resultValue, { color: theme.text }]}>
-                {finished.volumeKg > 0 ? volume : '—'}
+                {finished.loadKg > 0 ? load : '—'}
               </Text>
               <Text style={[styles.resultLabel, { color: theme.textSecondary }]}>kg levantados</Text>
             </View>
@@ -387,8 +383,8 @@ export default function WorkoutSessionScreen() {
           </View>
 
           <Text style={[styles.resultHint, { color: theme.textSecondary }]}>
-            Calorias estimadas com base no tempo e no seu peso corporal. Carga total calculada pelas
-            cargas registradas.
+            Calorias estimadas com base no tempo e no seu peso corporal. Carga total soma a carga
+            registrada de cada exercício uma única vez.
           </Text>
         </Card>
 
