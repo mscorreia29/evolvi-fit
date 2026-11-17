@@ -1,4 +1,4 @@
-const CACHE_NAME = 'evolvifit-v14';
+const CACHE_NAME = 'evolvifit-v15';
 const APP_SHELL = ['/', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
