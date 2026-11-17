@@ -302,7 +302,7 @@ export default function StudentWorkoutScreen() {
             <Button
               title="Treinar com um amigo"
               variant="secondary"
-              onPress={() => router.push('/aluno/treinos' as never)}
+              onPress={() => router.navigate('/aluno/treinos' as never)}
             />
           </>
         ) : (
@@ -350,7 +350,7 @@ export default function StudentWorkoutScreen() {
 
       <View style={styles.sectionRow}>
         <SectionHeader title="Próximos treinos" />
-        <Pressable onPress={() => router.push('/aluno/treinos' as never)} hitSlop={8}>
+        <Pressable onPress={() => router.navigate('/aluno/treinos' as never)} hitSlop={8}>
           <Text style={[styles.sectionLink, { color: Brand.primary }]}>Ver todos</Text>
         </Pressable>
       </View>

@@ -15,7 +15,6 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { resolveBrandCoverUrl } from '@/lib/branding';
 import { checkNewWorkouts } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import type { WorkoutWithDays } from '@/lib/types';
@@ -24,34 +23,45 @@ import { useAuth } from '@/providers/auth-provider';
 export default function StudentTrainingsScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { profile } = useAuth();
+  const { profile, brandCoverUrl } = useAuth();
 
   const [workouts, setWorkouts] = useState<WorkoutWithDays[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [video, setVideo] = useState<{ title: string; url: string; instructions?: string | null } | null>(null);
 
   const load = useCallback(async () => {
-    if (!profile) return;
-
-    const { data, error } = await supabase
-      .from('workouts')
-      .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
-      .eq('student_id', profile.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      setWorkouts([]);
-    } else {
-      const list = (data as unknown as WorkoutWithDays[]) ?? [];
-      setWorkouts(list);
-      await checkNewWorkouts(list.map((item) => item.id));
+    if (!profile) {
+      setLoading(false);
+      return;
     }
 
-    setCoverUrl(await resolveBrandCoverUrl(profile));
-    setLoading(false);
+    setError(null);
+
+    try {
+      const { data, error: loadError } = await supabase
+        .from('workouts')
+        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
+        .eq('student_id', profile.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (loadError) {
+        setError(loadError.message);
+        setWorkouts([]);
+        return;
+      }
+
+      const list = (data as unknown as WorkoutWithDays[]) ?? [];
+      setWorkouts(list);
+      checkNewWorkouts(list.map((item) => item.id)).catch(() => undefined);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar seus treinos.');
+      setWorkouts([]);
+    } finally {
+      setLoading(false);
+    }
   }, [profile]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -87,7 +97,7 @@ export default function StudentTrainingsScreen() {
         height={230}
         imagePosition="top"
         glowColor={Brand.accent}
-        coverUrl={coverUrl}>
+        coverUrl={brandCoverUrl}>
         <View style={styles.heroTop}>
           <View style={styles.heroTexts}>
             <View style={styles.kicker}>
@@ -109,7 +119,16 @@ export default function StudentTrainingsScreen() {
         subtitle={workouts.length > 0 ? 'Toque em iniciar para começar' : 'Aguardando seu personal'}
       />
 
-      {workouts.length === 0 ? (
+      {error ? (
+        <Card style={styles.emptyCard}>
+          <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name="alert-circle-outline" size={26} color={Brand.warning} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>Não foi possível carregar</Text>
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>{error}</Text>
+          <Button title="Tentar novamente" onPress={handleRefresh} loading={refreshing} />
+        </Card>
+      ) : workouts.length === 0 ? (
         <Card style={styles.emptyCard}>
           <View style={[styles.emptyIcon, { backgroundColor: theme.primarySoft }]}>
             <Ionicons name="barbell-outline" size={26} color={Brand.primary} />
