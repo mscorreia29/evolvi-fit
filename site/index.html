@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Evolvi Fit — Treinos, acompanhamento e IA</title>
+    <meta
+      name="description"
+      content="Evolvi Fit é a plataforma para personais trainers, alunos e alunos autônomos: montagem e execução de treinos, anamnese, avaliação física, comunicação, pagamentos, notificações e treinos gerados por IA."
+    />
+    <meta name="theme-color" content="#10182E" />
+    <link rel="icon" href="assets/favicon-32.png" sizes="32x32" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <svg class="svg-defs" aria-hidden="true">
+      <symbol id="i-dumbbell" viewBox="0 0 24 24">
+        <path d="M6.5 6.5v11M3.5 9v6M17.5 6.5v11M20.5 9v6M6.5 12h11" />
+      </symbol>
+      <symbol id="i-users" viewBox="0 0 24 24">
+        <path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20M12.5 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0ZM20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3.5 3.5 0 0 1 0 6.6" />
+      </symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24">
+        <path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z" />
+      </symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="M12 3 5 6v5c0 4.4 2.9 8.4 7 10 4.1-1.6 7-5.6 7-10V6l-7-3Z" />
+        <path d="m9 12 2 2 4-4" />
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24">
+        <path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7ZM10 20h4" />
+      </symbol>
+      <symbol id="i-card" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="M3 10h18M7 15h4" />
+      </symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24">
+        <path d="M21 12a8 8 0 0 1-8 8H7l-4 2 1.3-3.8A8 8 0 1 1 21 12Z" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24">
+        <path d="m8 5 11 7-11 7V5Z" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m5 13 4 4L19 7" />
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M5 12h14M14 7l5 5-5 5" />
+      </symbol>
+    </svg>
+
+    <header class="site-header">
+      <div class="container nav">
+        <a class="brand" href="#top" aria-label="Evolvi Fit, início">
+          <span class="brand-mark">E</span>
+          <span>Evolvi <strong>Fit</strong></span>
+        </a>
+        <nav class="nav-links" aria-label="Navegação principal">
+          <a href="#recursos">Recursos</a>
+          <a href="#como-funciona">Como funciona</a>
+          <a href="#ia">IA</a>
+          <a href="#seguranca">Segurança</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <div class="nav-actions">
+          <a class="btn btn-quiet" href="https://evolvi-fit.vercel.app/login">Entrar</a>
+          <a class="btn btn-small" href="https://evolvi-fit.vercel.app/signup-autonomo">Começar</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero container">
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="pulse"></span> Novo: treinos gerados por IA</span>
+          <h1>Treinos que evoluem <em>com você.</em></h1>
+          <p class="lead">
+            O Evolvi Fit reúne montagem de treinos, execução guiada, anamnese, acompanhamento,
+            comunicação e pagamentos em uma só plataforma. Para personais que querem escalar seu
+            atendimento e para alunos que querem treinar com propósito.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://evolvi-fit.vercel.app/signup-autonomo">
+              Treinar com IA <svg class="icon"><use href="#i-arrow" /></svg>
+            </a>
+            <a class="btn btn-secondary" href="https://evolvi-fit.vercel.app/signup">
+              Sou personal trainer
+            </a>
+          </div>
+          <div class="hero-proof">
+            <div><strong>3</strong><span>perfis de acesso</span></div>
+            <div><strong>IA</strong><span>Gemini e OpenAI</span></div>
+            <div><strong>PWA</strong><span>web instalável</span></div>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="orb orb-one"></div>
+          <div class="orb orb-two"></div>
+          <div class="phone">
+            <div class="phone-notch"></div>
+            <div class="phone-head">
+              <span class="phone-avatar">M</span>
+              <div>
+                <small>Boa tarde, Marina</small>
+                <strong>Seu treino de hoje</strong>
+              </div>
+            </div>
+            <div class="phone-card">
+              <div class="phone-card-top">
+                <span class="tag">TREINO A</span>
+                <span class="tag tag-ghost">48 min</span>
+              </div>
+              <strong>Full body · Força</strong>
+              <div class="phone-exercise">
+                <span class="exercise-num">01</span>
+                <div><b>Agachamento</b><small>4 séries · 10 reps</small></div>
+                <span class="exercise-check"><svg><use href="#i-check" /></svg></span>
+              </div>
+              <div class="phone-exercise">
+                <span class="exercise-num">02</span>
+                <div><b>Remada baixa</b><small>3 séries · 12 reps</small></div>
+                <span class="exercise-dot"></span>
+              </div>
+              <div class="phone-exercise">
+                <span class="exercise-num">03</span>
+                <div><b>Supino inclinado</b><small>3 séries · 10 reps</small></div>
+                <span class="exercise-dot"></span>
+              </div>
+            </div>
+            <div class="phone-bottom">
+              <span class="active">Início</span><span>Treinos</span><span>Histórico</span><span>Perfil</span>
+            </div>
+          </div>
+          <div class="float-card float-top">
+            <svg><use href="#i-chart" /></svg>
+            <div><small>Progresso semanal</small><strong>+18% volume</strong></div>
+          </div>
+          <div class="float-card float-bottom">
+            <span class="float-icon"><svg><use href="#i-spark" /></svg></span>
+            <div><small>Treino gerado</small><strong>por IA em segundos</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="strip" aria-label="Públicos atendidos">
+        <div class="container strip-grid">
+          <div><svg><use href="#i-users" /></svg><span>Personal trainers</span></div>
+          <div><svg><use href="#i-dumbbell" /></svg><span>Alunos vinculados</span></div>
+          <div><svg><use href="#i-spark" /></svg><span>Alunos autônomos com IA</span></div>
+          <div><svg><use href="#i-shield" /></svg><span>Admin Master</span></div>
+        </div>
+      </section>
+
+      <section class="section container" id="sobre">
+        <div class="section-head">
+          <span class="kicker">UMA PLATAFORMA COMPLETA</span>
+          <h2>Mais que um gerador de treinos.</h2>
+          <p>
+            O Evolvi Fit cobre a jornada inteira: do primeiro contato com o aluno até a execução do
+            treino, o feedback semanal e a gestão do negócio do personal.
+          </p>
+        </div>
+        <div class="three-cols">
+          <article class="feature-card">
+            <span class="feature-icon"><svg><use href="#i-dumbbell" /></svg></span>
+            <h3>Para treinar</h3>
+            <p>
+              Treinos por dia da semana, vídeos dos exercícios, cronômetro, descanso, carga, séries,
+              repetições e registro de sessão.
+            </p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-icon"><svg><use href="#i-chart" /></svg></span>
+            <h3>Para acompanhar</h3>
+            <p>
+              Anamnese, avaliação física, metas, check-ins, desafios, histórico, gráficos, XP e
+              notificações em tempo real.
+            </p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-icon"><svg><use href="#i-spark" /></svg></span>
+            <h3>Para escalar</h3>
+            <p>
+              Cadastro autônomo com IA, convites, gestão financeira, chat, auditoria e controle
+              global pelo Admin Master.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section-alt" id="recursos">
+        <div class="container">
+          <div class="section-head">
+            <span class="kicker">RECURSOS</span>
+            <h2>Tudo o que o app faz</h2>
+            <p>Quatro áreas conectadas, cada uma com ferramentas próprias.</p>
+          </div>
+
+          <div class="audience">
+            <div class="audience-title">
+              <span class="audience-badge personal">Personal trainer</span>
+              <h3>Gestão completa dos seus alunos</h3>
+            </div>
+            <div class="feature-grid">
+              <article><svg><use href="#i-users" /></svg><div><h4>Alunos e convites</h4><p>Lista com busca, convite por email, link de uso único, expiração em 14 dias, reenvio e histórico.</p></div></article>
+              <article><svg><use href="#i-dumbbell" /></svg><div><h4>Montador de treinos</h4><p>Divisões A/B/C, biblioteca de exercícios, vídeos, séries, repetições, descanso, ordem e observações.</p></div></article>
+              <article><svg><use href="#i-chart" /></svg><div><h4>Ficha e evolução</h4><p>Anamnese, avaliação física, metas, notas privadas, check-ins semanais e desafios diários.</p></div></article>
+              <article><svg><use href="#i-chat" /></svg><div><h4>Comunicação</h4><p>Chat individual, não lidas, solicitações de feedback e respostas com status aberto/lido/resolvido.</p></div></article>
+              <article><svg><use href="#i-card" /></svg><div><h4>Financeiro</h4><p>Cobranças por aluno, vencimento, status pendente/pago/atrasado/cancelado e lembretes automáticos.</p></div></article>
+              <article><svg><use href="#i-spark" /></svg><div><h4>Plano alimentar</h4><p>Refeições, horários, itens, quantidades e calorias calculadas automaticamente.</p></div></article>
+            </div>
+          </div>
+
+          <div class="audience">
+            <div class="audience-title">
+              <span class="audience-badge aluno">Aluno vinculado</span>
+              <h3>Seu treino, do começo ao fim</h3>
+            </div>
+            <div class="feature-grid">
+              <article><svg><use href="#i-dumbbell" /></svg><div><h4>Execução guiada</h4><p>Carrossel de exercícios com vídeo, timer flutuante, descanso, observação e marcação de exercício.</p></div></article>
+              <article><svg><use href="#i-chart" /></svg><div><h4>Histórico e progresso</h4><p>Streak, gráfico semanal, duração, calorias, volume levantado e detalhes de cada sessão.</p></div></article>
+              <article><svg><use href="#i-bell" /></svg><div><h4>Notificações certas</h4><p>Lembretes de treino, água, refeição, check-in, mensagens, metas e novos treinos publicados.</p></div></article>
+              <article><svg><use href="#i-chat" /></svg><div><h4>Fale com seu personal</h4><p>Chat direto, envio de feedback e acompanhamento das respostas e cobranças.</p></div></article>
+              <article><svg><use href="#i-shield" /></svg><div><h4>Seus dados</h4><p>Anamnese, avaliações, metas, exportação em JSON e solicitação de exclusão de conta.</p></div></article>
+              <article><svg><use href="#i-spark" /></svg><div><h4>Engajamento</h4><p>Desafio do dia, missões, XP, check-in semanal e capa personalizada pelo seu personal.</p></div></article>
+            </div>
+          </div>
+
+          <div class="audience">
+            <div class="audience-title">
+              <span class="audience-badge ia">Aluno autônomo com IA</span>
+              <h3>Comece sem depender de um personal</h3>
+            </div>
+            <div class="feature-grid">
+              <article><svg><use href="#i-users" /></svg><div><h4>Cadastro direto</h4><p>Entre como aluno autônomo, sem convite e sem vínculo com personal trainer.</p></div></article>
+              <article><svg><use href="#i-chart" /></svg><div><h4>Anamnese completa</h4><p>Idade, peso, altura, objetivo, nível, dias por semana, duração, local, restrições e lesões.</p></div></article>
+              <article><svg><use href="#i-spark" /></svg><div><h4>Plano gerado por IA</h4><p>Gemini ou OpenAI montam dias, exercícios, séries, repetições e descanso em JSON validado.</p></div></article>
+              <article><svg><use href="#i-dumbbell" /></svg><div><h4>Mesma experiência</h4><p>O treino gerado aparece na aba de treinos e usa o mesmo player de execução dos demais alunos.</p></div></article>
+              <article><svg><use href="#i-shield" /></svg><div><h4>Limite controlado</h4><p>Intervalo entre gerações e liberação manual de regeneração pelo administrador.</p></div></article>
+              <article><svg><use href="#i-bell" /></svg><div><h4>Chave segura</h4><p>A chave de IA fica no servidor, em secrets do Supabase ou no painel admin, nunca no bundle web.</p></div></article>
+            </div>
+          </div>
+
+          <div class="audience">
+            <div class="audience-title">
+              <span class="audience-badge admin">Admin Master</span>
+              <h3>Controle global do sistema</h3>
+            </div>
+            <div class="feature-grid">
+              <article><svg><use href="#i-users" /></svg><div><h4>Personais</h4><p>Aprovar, rejeitar, bloquear, liberar dias de acesso, criar conta, trocar email e redefinir senha.</p></div></article>
+              <article><svg><use href="#i-chart" /></svg><div><h4>Painel e métricas</h4><p>Contadores de personais, alunos, cobranças pendentes, bloqueios e ações de auditoria.</p></div></article>
+              <article><svg><use href="#i-card" /></svg><div><h4>Cobranças e pagamentos</h4><p>Visão de todas as cobranças, filtros por status e ações de pago/cancelado.</p></div></article>
+              <article><svg><use href="#i-spark" /></svg><div><h4>Configurações de IA</h4><p>Ativar cadastro autônomo, escolher provedor, modelo, prompt, intervalo e regeneração livre.</p></div></article>
+              <article><svg><use href="#i-shield" /></svg><div><h4>Regras globais</h4><p>Dias de teste, auto-cadastro de personais, bloqueio de trial vencido e limite de alunos.</p></div></article>
+              <article><svg><use href="#i-check" /></svg><div><h4>Auditoria</h4><p>Registro de bloqueios, status, acessos, alterações de email, senhas e configurações.</p></div></article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section container" id="como-funciona">
+        <div class="section-head">
+          <span class="kicker">COMO FUNCIONA</span>
+          <h2>Da entrada ao treino em quatro passos</h2>
+        </div>
+        <div class="steps">
+          <article><span>01</span><h3>Entre</h3><p>Crie como personal, aceite um convite de aluno ou faça cadastro autônomo com IA.</p></article>
+          <article><span>02</span><h3>Prepare</h3><p>Preencha anamnese e avaliação física, ou deixe a IA montar o plano automaticamente.</p></article>
+          <article><span>03</span><h3>Treine</h3><p>Abra o treino no app, siga vídeos, timer e descanso, registre séries, repetições e carga.</p></article>
+          <article><span>04</span><h3>Evolua</h3><p>Acompanhe histórico, metas, check-ins, feedbacks, notificações e ajustes do personal.</p></article>
+        </div>
+      </section>
+
+      <section class="section ia-section" id="ia">
+        <div class="container ia-grid">
+          <div class="ia-copy">
+            <span class="kicker">INTELIGÊNCIA ARTIFICIAL</span>
+            <h2>Um treino feito para o seu corpo, não um modelo genérico.</h2>
+            <p>
+              No cadastro autônomo, você responde a uma anamnese objetiva. A Edge Function valida a
+              sessão, respeita o intervalo de geração, chama Gemini ou OpenAI e salva o plano nas
+              mesmas tabelas de treinos do app.
+            </p>
+            <ul class="check-list">
+              <li><svg><use href="#i-check" /></svg>Até 7 dias e 12 exercícios por dia</li>
+              <li><svg><use href="#i-check" /></svg>Séries, repetições, descanso e notas validados</li>
+              <li><svg><use href="#i-check" /></svg>Restrições e lesões consideradas no prompt</li>
+              <li><svg><use href="#i-check" /></svg>Regeneração controlada pelo Admin Master</li>
+            </ul>
+            <a class="link-arrow" href="https://evolvi-fit.vercel.app/signup-autonomo">
+              Quero meu treino com IA <svg><use href="#i-arrow" /></svg>
+            </a>
+          </div>
+          <div class="ia-visual">
+            <img src="assets/fitness-workout.jpg" alt="Aluno treinando com peso livre na academia" />
+            <div class="ia-overlay">
+              <span class="pulse"></span>
+              <div><small>IA → JSON validado → treino ativo</small><strong>Pronto para treinar</strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section container split" id="execucao">
+        <div class="split-media">
+          <img src="assets/fitness-student.jpg" alt="Aluno realizando treino com acompanhamento" />
+        </div>
+        <div class="split-copy">
+          <span class="kicker">EXECUÇÃO</span>
+          <h2>O treino acontece dentro do app.</h2>
+          <p>
+            Nada de planilha solta. Cada exercício tem vídeo, métricas e controles de descanso. A
+            sessão termina com duração, calorias e volume registrados no histórico.
+          </p>
+          <div class="mini-grid">
+            <div><svg><use href="#i-play" /></svg><b>Vídeo por exercício</b></div>
+            <div><svg><use href="#i-bell" /></svg><b>Timer e vibração</b></div>
+            <div><svg><use href="#i-chart" /></svg><b>Carga e volume</b></div>
+            <div><svg><use href="#i-check" /></svg><b>Finalizar e desfazer</b></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-alt" id="seguranca">
+        <div class="container">
+          <div class="section-head">
+            <span class="kicker">SEGURANÇA E TECNOLOGIA</span>
+            <h2>Construído para proteger dados e escalar.</h2>
+          </div>
+          <div class="three-cols">
+            <article class="feature-card">
+              <span class="feature-icon"><svg><use href="#i-shield" /></svg></span>
+              <h3>RLS no Supabase</h3>
+              <p>
+                Personais veem apenas seus alunos. Alunos veem apenas seus treinos, mensagens,
+                cobranças e notificações. Admins têm escopo separado.
+              </p>
+            </article>
+            <article class="feature-card">
+              <span class="feature-icon"><svg><use href="#i-spark" /></svg></span>
+              <h3>IA server-side</h3>
+              <p>
+                Edge Functions validam JWT, usam service role apenas no servidor e leem chaves de
+                secrets ou de configuração administrativa.
+              </p>
+            </article>
+            <article class="feature-card">
+              <span class="feature-icon"><svg><use href="#i-check" /></svg></span>
+              <h3>PWA e offline</h3>
+              <p>
+                Interface instalável na web, cache controlado por service worker e fallback offline
+                para navegação.
+              </p>
+            </article>
+          </div>
+          <div class="stack-row">
+            <span>Expo / React Native</span><span>Supabase</span><span>Edge Functions</span><span>PostgreSQL</span><span>Expo Router</span><span>Notificações</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section container" id="acesso">
+        <div class="section-head">
+          <span class="kicker">ACESSO</span>
+          <h2>Como funciona a liberação</h2>
+          <p>
+            O sistema usa teste e liberação administrativa. Não existe checkout online ou plano
+            assinado automaticamente no aplicativo.
+          </p>
+        </div>
+        <div class="three-cols">
+          <article class="plan-card">
+            <span class="plan-name">Personal trainer</span>
+            <strong>7 dias de teste</strong>
+            <p>Padrão configurável pelo Admin Master. Contas pendentes, rejeitadas ou bloqueadas não entram.</p>
+          </article>
+          <article class="plan-card featured">
+            <span class="plan-name">Aluno</span>
+            <strong>Vinculado ou autônomo</strong>
+            <p>Entra por convite do personal ou pelo cadastro autônomo com IA, quando habilitado.</p>
+          </article>
+          <article class="plan-card">
+            <span class="plan-name">Pagamentos</span>
+            <strong>Gestão manual</strong>
+            <p>Cobranças criadas pelo personal, visíveis no app, com marcação de pago/cancelado pelo admin.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section container faq" id="faq">
+        <div class="section-head">
+          <span class="kicker">PERGUNTAS FREQUENTES</span>
+          <h2>Dúvidas comuns</h2>
+        </div>
+        <div class="faq-list">
+          <details open>
+            <summary>Posso usar sem personal trainer?</summary>
+            <p>
+              Sim. Quando o Admin Master habilita o módulo, você pode se cadastrar como aluno
+              autônomo, preencher a anamnese e receber um treino gerado por IA.
+            </p>
+          </details>
+          <details>
+            <summary>O aluno autônomo aparece para personais?</summary>
+            <p>
+              Não. Ele mantém o papel de aluno, mas fica marcado como autônomo e separado dos alunos
+              vinculados a um personal.
+            </p>
+          </details>
+          <details>
+            <summary>Quais provedores de IA são suportados?</summary>
+            <p>Gemini e OpenAI. A escolha, o modelo e a chave ficam no painel Admin Master ou em secrets do Supabase.</p>
+          </details>
+          <details>
+            <summary>Posso exportar ou excluir meus dados?</summary>
+            <p>
+              Sim. No perfil do aluno existe exportação de dados em JSON e solicitação de exclusão
+              de conta registrada como feedback para o administrador.
+            </p>
+          </details>
+          <details>
+            <summary>Funciona no celular?</summary>
+            <p>
+              O app é responsivo e também pode ser instalado como PWA. O layout foi pensado primeiro
+              para telas pequenas, com navegação por abas.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section class="cta" id="app">
+        <div class="container cta-inner">
+          <div>
+            <span class="kicker">PRONTO PARA COMEÇAR?</span>
+            <h2>Seu próximo treino começa aqui.</h2>
+            <p>Entre na conta, gere seu plano com IA ou comece a gerenciar seus alunos hoje.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn btn-light" href="https://evolvi-fit.vercel.app/login">Abrir o app</a>
+            <a class="btn btn-outline" href="https://evolvi-fit.vercel.app/signup-autonomo">Criar conta autônoma</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div>
+          <a class="brand" href="#top"><span class="brand-mark">E</span><span>Evolvi <strong>Fit</strong></span></a>
+          <p>Treinos, evolução e gestão em uma plataforma só.</p>
+        </div>
+        <div>
+          <strong>Produto</strong>
+          <a href="#recursos">Recursos</a><a href="#ia">IA</a><a href="#como-funciona">Como funciona</a>
+        </div>
+        <div>
+          <strong>Acesso</strong>
+          <a href="https://evolvi-fit.vercel.app/login">Entrar</a><a href="https://evolvi-fit.vercel.app/signup">Ser personal</a><a href="https://evolvi-fit.vercel.app/signup-autonomo">Ser autônomo</a>
+        </div>
+        <div>
+          <strong>Institucional</strong>
+          <a href="#seguranca">Segurança</a><a href="#acesso">Acesso</a><a href="#faq">FAQ</a>
+        </div>
+      </div>
+      <div class="container footer-bottom">© 2026 Evolvi Fit. Todos os direitos reservados.</div>
+    </footer>
+  </body>
+</html>
