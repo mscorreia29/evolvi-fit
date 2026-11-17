@@ -38,6 +38,186 @@ function Message({ children, tone }: { children: ReactNode; tone: 'error' | 'suc
   );
 }
 
+type InstallPlatform = 'ios' | 'android';
+type IllustrationKind =
+  | 'ios-share'
+  | 'ios-sheet'
+  | 'ios-home'
+  | 'android-menu'
+  | 'android-install'
+  | 'android-allow'
+  | 'android-settings';
+
+function MockBrowser({ right, children }: { right?: ReactNode; children: ReactNode }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.mockWindow, { borderColor: theme.border, backgroundColor: theme.backgroundSelected }]}>
+      <View style={styles.mockBrowserBar}>
+        <View style={styles.mockDots}>
+          <View style={[styles.mockDot, { backgroundColor: Brand.danger }]} />
+          <View style={[styles.mockDot, { backgroundColor: Brand.warning }]} />
+          <View style={[styles.mockDot, { backgroundColor: Brand.success }]} />
+        </View>
+        <View style={[styles.mockUrl, { backgroundColor: theme.backgroundElement }]}>
+          <Text style={[styles.mockUrlText, { color: theme.textSecondary }]}>evolvi-fit.vercel.app</Text>
+        </View>
+        <View style={styles.mockBarRight}>{right}</View>
+      </View>
+      <View style={styles.mockBrowserBody}>{children}</View>
+    </View>
+  );
+}
+
+function GuideIllustration({ kind }: { kind: IllustrationKind }) {
+  const theme = useTheme();
+
+  if (kind === 'ios-share') {
+    return (
+      <MockBrowser
+        right={
+          <View style={[styles.mockHighlight, { borderColor: Brand.primary }]}>
+            <Ionicons name="share-outline" size={15} color={Brand.primary} />
+          </View>
+        }>
+        <View style={styles.mockCenterRow}>
+          <Text style={[styles.mockHint, { color: theme.textSecondary }]}>Toque no ícone de compartilhar acima</Text>
+        </View>
+      </MockBrowser>
+    );
+  }
+
+  if (kind === 'ios-sheet') {
+    return (
+      <View style={[styles.mockSheet, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <View style={[styles.mockSheetHandle, { backgroundColor: theme.border }]} />
+        <View style={styles.mockSheetRow}>
+          <Ionicons name="share-outline" size={15} color={theme.textSecondary} />
+          <Text style={[styles.mockSheetText, { color: theme.textSecondary }]}>Compartilhar</Text>
+        </View>
+        <View style={[styles.mockSheetRow, styles.mockSheetRowActive, { backgroundColor: theme.primarySoft, borderColor: Brand.primary }]}>
+          <Ionicons name="add-circle-outline" size={15} color={Brand.primary} />
+          <Text style={[styles.mockSheetText, { color: Brand.primary }]}>Adicionar à Tela de Início</Text>
+        </View>
+        <View style={styles.mockSheetRow}>
+          <Ionicons name="copy-outline" size={15} color={theme.textSecondary} />
+          <Text style={[styles.mockSheetText, { color: theme.textSecondary }]}>Copiar link</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (kind === 'ios-home') {
+    return (
+      <View style={[styles.mockHome, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
+        <View style={[styles.mockAppIcon, { backgroundColor: Brand.primary }]}>
+          <Ionicons name="apps-outline" size={22} color="#FFFFFF" />
+        </View>
+        <Text style={[styles.mockHomeLabel, { color: theme.text }]}>Evolvi Fit</Text>
+        <View style={[styles.mockCheck, { borderColor: Brand.primary }]}>
+          <Ionicons name="checkmark-outline" size={14} color={Brand.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (kind === 'android-menu') {
+    return (
+      <MockBrowser
+        right={
+          <View style={[styles.mockHighlight, { borderColor: Brand.primary }]}>
+            <Ionicons name="ellipsis-vertical" size={15} color={Brand.primary} />
+          </View>
+        }>
+        <View style={styles.mockCenterRow}>
+          <Text style={[styles.mockHint, { color: theme.textSecondary }]}>Toque nos três pontos acima</Text>
+        </View>
+      </MockBrowser>
+    );
+  }
+
+  if (kind === 'android-install') {
+    return (
+      <View style={[styles.mockMenu, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <View style={styles.mockMenuRow}>
+          <Ionicons name="share-outline" size={14} color={theme.textSecondary} />
+          <Text style={[styles.mockMenuText, { color: theme.textSecondary }]}>Compartilhar</Text>
+        </View>
+        <View style={[styles.mockMenuRow, styles.mockMenuRowActive, { backgroundColor: theme.primarySoft, borderColor: Brand.primary }]}>
+          <Ionicons name="download-outline" size={14} color={Brand.primary} />
+          <Text style={[styles.mockMenuText, { color: Brand.primary }]}>Instalar app</Text>
+        </View>
+        <View style={styles.mockMenuRow}>
+          <Ionicons name="add-circle-outline" size={14} color={theme.textSecondary} />
+          <Text style={[styles.mockMenuText, { color: theme.textSecondary }]}>Adicionar à tela inicial</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (kind === 'android-allow') {
+    return (
+      <View style={[styles.mockDialog, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <Ionicons name="notifications-outline" size={20} color={Brand.primary} />
+        <Text style={[styles.mockDialogTitle, { color: theme.text }]}>Permitir notificações?</Text>
+        <Text style={[styles.mockDialogText, { color: theme.textSecondary }]}>Avisos de treinos, mensagens e feedbacks.</Text>
+        <View style={styles.mockDialogActions}>
+          <View style={[styles.mockDialogGhost, { borderColor: theme.border }]}>
+            <Text style={[styles.mockDialogButtonText, { color: theme.textSecondary }]}>Não permitir</Text>
+          </View>
+          <View style={[styles.mockDialogPrimary, { backgroundColor: Brand.primary }]}>
+            <Text style={[styles.mockDialogButtonText, { color: '#FFFFFF' }]}>Permitir</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.mockSettings, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+      <View style={styles.mockSettingsRow}>
+        <Ionicons name="notifications-outline" size={15} color={Brand.primary} />
+        <Text style={[styles.mockSettingsText, { color: theme.text }]}>Notificações</Text>
+        <View style={[styles.mockToggle, { backgroundColor: Brand.primary }]}>
+          <View style={styles.mockToggleKnob} />
+        </View>
+      </View>
+      <View style={styles.mockSettingsRow}>
+        <Ionicons name="globe-outline" size={15} color={theme.textSecondary} />
+        <Text style={[styles.mockSettingsText, { color: theme.textSecondary }]}>evolvi-fit.vercel.app</Text>
+        <Text style={[styles.mockSettingsValue, { color: Brand.success }]}>Permitido</Text>
+      </View>
+    </View>
+  );
+}
+
+function InstallStep({
+  number,
+  title,
+  description,
+  illustration,
+}: {
+  number: number;
+  title: string;
+  description: string;
+  illustration: IllustrationKind;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.installStepCard, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
+      <View style={styles.installStepHeader}>
+        <View style={[styles.installStepNumber, { backgroundColor: Brand.primary }]}>
+          <Text style={styles.installStepNumberText}>{number}</Text>
+        </View>
+        <View style={styles.installStepTexts}>
+          <Text style={[styles.installStepTitle, { color: theme.text }]}>{title}</Text>
+          <Text style={[styles.installStepDescription, { color: theme.textSecondary }]}>{description}</Text>
+        </View>
+      </View>
+      <GuideIllustration kind={illustration} />
+    </View>
+  );
+}
+
 export default function PersonalProfileScreen() {
   const router = useRouter();
   const theme = useTheme();
@@ -61,6 +241,9 @@ export default function PersonalProfileScreen() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  const [installOpen, setInstallOpen] = useState(false);
+  const [installPlatform, setInstallPlatform] = useState<InstallPlatform>('android');
 
   const loadSettings = useCallback(async () => {
     if (!profile) return;
@@ -287,36 +470,90 @@ export default function PersonalProfileScreen() {
       </Card>
 
       <Card>
-        <SectionTitle icon="phone-portrait-outline" title="Instalar o app" />
+        <SectionTitle icon="download-outline" title="Instalar o app" />
         <Text style={[styles.hint, { color: theme.textSecondary }]}>
-          Escolha seu celular e siga os passos para deixar o Evolvi Fit na tela inicial.
+          Abra o guia e siga as telas destacadas para colocar o Evolvi Fit na tela inicial.
         </Text>
+        <Button
+          title={installOpen ? 'Ocultar guia' : 'Ver passo a passo'}
+          variant="secondary"
+          onPress={() => setInstallOpen((open) => !open)}
+        />
 
-        <View style={styles.installBlock}>
-          <Text style={[styles.installPlatform, { color: theme.text }]}>iPhone / iPad (Safari)</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>1. Abra evolvi-fit.vercel.app no Safari.</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>2. Toque no botão Compartilhar (quadrado com seta para cima).</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>3. Role a lista e toque em &quot;Adicionar à Tela de Início&quot;.</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>4. Toque em &quot;Adicionar&quot;.</Text>
-          <Text style={[styles.installNote, { color: theme.textSecondary }]}>
-            Notificações: abra o app instalado e permita quando o navegador pedir. Se não aparecer, acompanhe os avisos pelo sino dentro do app.
-          </Text>
-        </View>
+        {installOpen ? (
+          <View style={styles.installGuide}>
+            <View style={[styles.platformTabs, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
+              <Pressable
+                onPress={() => setInstallPlatform('ios')}
+                style={[styles.platformTab, installPlatform === 'ios' ? { backgroundColor: Brand.primary } : null]}>
+                <Text style={[styles.platformTabText, { color: installPlatform === 'ios' ? '#FFFFFF' : theme.textSecondary }]}>
+                  iPhone
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setInstallPlatform('android')}
+                style={[styles.platformTab, installPlatform === 'android' ? { backgroundColor: Brand.primary } : null]}>
+                <Text style={[styles.platformTabText, { color: installPlatform === 'android' ? '#FFFFFF' : theme.textSecondary }]}>
+                  Android
+                </Text>
+              </Pressable>
+            </View>
 
-        <View style={[styles.installBlock, { borderTopWidth: 1, borderTopColor: theme.border }]}>
-          <Text style={[styles.installPlatform, { color: theme.text }]}>Android (Chrome)</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>1. Abra evolvi-fit.vercel.app no Chrome.</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>2. Toque no menu (⋮) e escolha &quot;Instalar app&quot; ou &quot;Adicionar à tela inicial&quot;.</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>3. Confirme a instalação.</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>4. Abra o app instalado e toque em &quot;Permitir&quot; quando pedir notificações.</Text>
-          <Text style={[styles.installStep, { color: theme.text }]}>5. Se não aparecer o pedido: menu (⋮) do app → Informações do app (ⓘ) → Notificações → Ativar.</Text>
-          <Text style={[styles.installNote, { color: theme.textSecondary }]}>
-            Outro caminho: Chrome → menu (⋮) → Configurações → Configurações do site → Notificações → permitir evolvi-fit.vercel.app.
-          </Text>
-          <Text style={[styles.installNote, { color: theme.textSecondary }]}>
-            Com notificações ativas você recebe avisos de treinos, mensagens, feedbacks e lembretes do app.
-          </Text>
-        </View>
+            {installPlatform === 'ios' ? (
+              <View style={styles.installSteps}>
+                <InstallStep
+                  number={1}
+                  title="Abra no Safari"
+                  description="Entre no site pelo Safari e toque no ícone de compartilhar no topo."
+                  illustration="ios-share"
+                />
+                <InstallStep
+                  number={2}
+                  title="Adicionar à tela inicial"
+                  description="Na lista que abre, escolha Adicionar à Tela de Início."
+                  illustration="ios-sheet"
+                />
+                <InstallStep
+                  number={3}
+                  title="Confirmar"
+                  description="Toque em Adicionar. O app aparece na tela inicial."
+                  illustration="ios-home"
+                />
+              </View>
+            ) : (
+              <View style={styles.installSteps}>
+                <InstallStep
+                  number={1}
+                  title="Abra no Chrome"
+                  description="Entre no site pelo Chrome e toque no menu de três pontos."
+                  illustration="android-menu"
+                />
+                <InstallStep
+                  number={2}
+                  title="Instalar o app"
+                  description="Escolha Instalar app e confirme a instalação."
+                  illustration="android-install"
+                />
+                <InstallStep
+                  number={3}
+                  title="Permitir notificações"
+                  description="Ao abrir o app, toque em Permitir para receber avisos."
+                  illustration="android-allow"
+                />
+                <InstallStep
+                  number={4}
+                  title="Se não aparecer o pedido"
+                  description="Ative Notificações em Informações do app ou permita o site no Chrome."
+                  illustration="android-settings"
+                />
+              </View>
+            )}
+
+            <Text style={[styles.installFooter, { color: theme.textSecondary }]}>
+              Depois de instalar, abra o app pelo ícone na tela inicial.
+            </Text>
+          </View>
+        ) : null}
       </Card>
 
       <Badge label="Conta segura e sincronizada" tone="muted" style={styles.footerBadge} />
@@ -363,23 +600,266 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  installBlock: {
-    gap: 4,
-    paddingTop: Spacing.two,
+  installGuide: {
+    gap: Spacing.two,
+    marginTop: Spacing.two,
   },
-  installPlatform: {
+  platformTabs: {
+    flexDirection: 'row',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    padding: 3,
+    gap: 3,
+  },
+  platformTab: {
+    flex: 1,
+    borderRadius: Radius.full,
+    paddingVertical: 7,
+    alignItems: 'center',
+  },
+  platformTabText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  installSteps: {
+    gap: Spacing.two,
+  },
+  installStepCard: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.two,
+    gap: Spacing.two,
+  },
+  installStepHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+  },
+  installStepNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  installStepNumberText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  installStepTexts: {
+    flex: 1,
+    gap: 2,
+  },
+  installStepTitle: {
     fontSize: 13,
     fontWeight: '800',
-    marginBottom: 2,
   },
-  installStep: {
+  installStepDescription: {
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
   },
-  installNote: {
+  installFooter: {
     fontSize: 11,
     lineHeight: 16,
-    marginTop: 2,
+    textAlign: 'center',
+  },
+  mockWindow: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+  },
+  mockBrowserBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  mockDots: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  mockDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  mockUrl: {
+    flex: 1,
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  mockUrlText: {
+    fontSize: 8,
+  },
+  mockBarRight: {
+    width: 22,
+    alignItems: 'center',
+  },
+  mockHighlight: {
+    borderWidth: 2,
+    borderRadius: 9,
+    padding: 2,
+  },
+  mockBrowserBody: {
+    minHeight: 54,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockCenterRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockHint: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  mockSheet: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    padding: 8,
+    gap: 6,
+  },
+  mockSheetHandle: {
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    alignSelf: 'center',
+  },
+  mockSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  mockSheetRowActive: {
+    borderWidth: 1,
+  },
+  mockSheetText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  mockHome: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    padding: 12,
+    alignItems: 'center',
+    gap: 6,
+  },
+  mockAppIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockHomeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  mockCheck: {
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 2,
+  },
+  mockMenu: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    padding: 8,
+    gap: 4,
+  },
+  mockMenuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  mockMenuRowActive: {
+    borderWidth: 1,
+  },
+  mockMenuText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  mockDialog: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    padding: 12,
+    alignItems: 'center',
+    gap: 5,
+  },
+  mockDialogTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  mockDialogText: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  mockDialogActions: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  mockDialogGhost: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  mockDialogPrimary: {
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  mockDialogButtonText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  mockSettings: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    padding: 10,
+    gap: 8,
+  },
+  mockSettingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mockSettingsText: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  mockSettingsValue: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  mockToggle: {
+    width: 26,
+    height: 15,
+    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  mockToggleKnob: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    alignSelf: 'flex-end',
   },
   sectionTitleRow: {
     flexDirection: 'row',
