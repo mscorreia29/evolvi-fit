@@ -26,6 +26,7 @@ export default function AdminLayout() {
       <Stack.Screen name="auditoria" />
       <Stack.Screen name="pagamentos" />
       <Stack.Screen name="configuracoes" />
+      <Stack.Screen name="configuracoes-ia" />
     </Stack>
   );
 }

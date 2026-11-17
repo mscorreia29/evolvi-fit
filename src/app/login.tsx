@@ -60,6 +60,12 @@ export default function LoginScreen() {
           <Text style={[styles.studentHint, { color: theme.textSecondary }]}>
             É aluno? Peça ao seu personal para enviar o convite de acesso.
           </Text>
+          <Pressable onPress={() => router.push('/signup-autonomo' as never)}>
+            <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+              Quer treinar sem personal?{' '}
+              <Text style={{ color: Brand.primary, fontWeight: '700' }}>Cadastro autônomo com IA</Text>
+            </Text>
+          </Pressable>
         </View>
       }>
       {!isSupabaseConfigured ? (

@@ -173,6 +173,12 @@ export default function AdminDashboard() {
             </View>
             <Text style={[styles.quickText, { color: theme.text }]}>Configurações</Text>
           </Pressable>
+          <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/admin/configuracoes-ia' as never)}>
+            <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
+              <Ionicons name="flash-outline" size={20} color={Brand.primary} />
+            </View>
+            <Text style={[styles.quickText, { color: theme.text }]}>Alunos com IA</Text>
+          </Pressable>
           <Pressable style={[styles.quickItem, { borderColor: theme.border }]} onPress={() => router.push('/admin/auditoria' as never)}>
             <View style={[styles.quickIcon, { backgroundColor: theme.primarySoft }]}>
               <Ionicons name="list-outline" size={20} color={Brand.primary} />
