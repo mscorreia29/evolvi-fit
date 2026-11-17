@@ -67,6 +67,27 @@ function dayLetter(index: number) {
   return String.fromCharCode(65 + (index % 26));
 }
 
+const SEARCH_ALIASES: Record<string, string> = {
+  pranxa: 'prancha',
+  prancha: 'prancha',
+  triceps: 'triceps',
+  'barra w': 'barra w',
+};
+
+function normalizeSearch(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[áàâãä]/g, 'a')
+    .replace(/[éèêë]/g, 'e')
+    .replace(/[íìîï]/g, 'i')
+    .replace(/[óòôõö]/g, 'o')
+    .replace(/[úùûü]/g, 'u')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function PreferenceRow({ label, value }: { label: string; value?: string | null }) {
   const theme = useTheme();
 
@@ -252,17 +273,17 @@ export default function NewWorkoutScreen() {
   }, [editingId]);
 
   const filteredLibrary = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = normalizeSearch(search.trim());
+    const query = SEARCH_ALIASES[term] ?? term;
     return library.filter((item) => {
       if (libraryCategory !== 'all' && getExerciseCategory(item) !== libraryCategory) {
         return false;
       }
-      if (!term) return true;
-      return (
-        item.name.toLowerCase().includes(term) ||
-        (item.muscle_group ?? '').toLowerCase().includes(term) ||
-        (item.equipment ?? '').toLowerCase().includes(term)
+      if (!query) return true;
+      const haystack = normalizeSearch(
+        [item.name, item.muscle_group ?? '', item.equipment ?? ''].join(' '),
       );
+      return haystack.includes(query);
     });
   }, [library, libraryCategory, search]);
 
