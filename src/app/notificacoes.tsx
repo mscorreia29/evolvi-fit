@@ -54,7 +54,9 @@ export default function NotificationsScreen() {
     if (!profile) return;
 
     const channel = supabase
-      .channel(`notifications-screen-${profile.id}`)
+      .channel(
+        `notifications-screen-${profile.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
       .on(
         'postgres_changes',
         {

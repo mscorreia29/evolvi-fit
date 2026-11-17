@@ -30,7 +30,9 @@ export function NotificationBell() {
     if (!profile) return;
 
     const channel = supabase
-      .channel(`notifications-bell-${profile.id}`)
+      .channel(
+        `notifications-bell-${profile.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
       .on(
         'postgres_changes',
         {
