@@ -3,7 +3,6 @@ import { useFocusEffect, useRouter, type ErrorBoundaryProps } from 'expo-router'
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ExerciseVideoModal } from '@/components/exercise-video-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,7 +14,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { estimateWorkoutMinutes, getExerciseCategory, isCardioCategory } from '@/lib/exercises';
+import { estimateWorkoutMinutes } from '@/lib/exercises';
 import { checkNewWorkouts } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import type { WorkoutWithDays } from '@/lib/types';
@@ -24,12 +23,6 @@ import { useAuth } from '@/providers/auth-provider';
 function asText(value: unknown) {
   if (value === null || value === undefined) return '';
   return typeof value === 'string' ? value : String(value);
-}
-
-function asDisplayNumber(value: unknown) {
-  if (value === null || value === undefined || value === '') return '';
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? String(numeric) : String(value);
 }
 
 function asOrder(value: unknown) {
@@ -46,7 +39,6 @@ export default function StudentTrainingsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [video, setVideo] = useState<{ title: string; url: string; instructions?: string | null } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) {
@@ -179,93 +171,33 @@ export default function StudentTrainingsScreen() {
                     {asText(workout.name) || 'Treino'}
                   </Text>
                   <Text style={[styles.workoutMeta, { color: theme.textSecondary }]}>
-                    {days.length} divisão(ões) · {exerciseTotal} exercícios · ~{minutes} min
+                    {days.length} treino(s) · {exerciseTotal} exercícios · ~{minutes} min
                   </Text>
                 </View>
                 <Badge label="ATIVO" tone="success" />
               </View>
 
-              {days.map((day) => {
-                const exercises = [...(day?.workout_exercises ?? [])].sort(
-                  (a, b) => asOrder(a?.order_index) - asOrder(b?.order_index),
-                );
-
-                return (
-                  <View key={day?.id ?? day?.label} style={styles.dayBlock}>
-                    <View style={styles.dayHeader}>
-                      <View style={[styles.dayBadge, { backgroundColor: theme.primarySoft }]}>
-                        <Text style={[styles.dayBadgeText, { color: Brand.primary }]}>
-                          {asText(day?.label) || 'Dia'}
-                        </Text>
-                      </View>
-                      <Text style={[styles.dayLabel, { color: theme.textSecondary }]}>
-                        {exercises.length} exercício(s)
+              <View style={styles.daySummary}>
+                {days.map((day) => {
+                  const count = day?.workout_exercises?.length ?? 0;
+                  return (
+                    <View
+                      key={day?.id ?? day?.label}
+                      style={[styles.dayChip, { backgroundColor: theme.primarySoft }]}>
+                      <Text style={[styles.dayChipLabel, { color: Brand.primary }]}>
+                        {asText(day?.label) || 'Treino'}
+                      </Text>
+                      <Text style={[styles.dayChipCount, { color: theme.textSecondary }]}>
+                        {count} exercício(s)
                       </Text>
                     </View>
+                  );
+                })}
+              </View>
 
-                    {exercises.map((exercise) => {
-                      const name = asText(exercise?.name) || 'Exercício';
-                      const sets = asDisplayNumber(exercise?.sets);
-                      const reps = asText(exercise?.reps);
-                      const rest = asDisplayNumber(exercise?.rest_seconds);
-                      const notes = asText(exercise?.notes);
-                      const instructions = asText(exercise?.exercise?.instructions);
-                      const rawVideoUrl =
-                        exercise?.video_url || exercise?.exercise?.video_url || null;
-                      const videoUrl =
-                        typeof rawVideoUrl === 'string' && rawVideoUrl ? rawVideoUrl : null;
-                      const cardio = isCardioCategory(getExerciseCategory(exercise?.exercise));
-                      const details = cardio
-                        ? [
-                            sets ? `${sets} bloco(s)` : null,
-                            reps || null,
-                            rest ? `${rest}s desc.` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' • ')
-                        : [
-                            sets ? `${sets} séries` : null,
-                            reps ? `${reps} reps` : null,
-                            rest ? `${rest}s desc.` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' • ');
-
-                      return (
-                        <View key={exercise?.id ?? name} style={styles.exerciseRow}>
-                          <View style={styles.exerciseInfo}>
-                            <Text style={[styles.exerciseName, { color: theme.text }]}>{name}</Text>
-                            {details ? (
-                              <Text style={[styles.exerciseMeta, { color: theme.textSecondary }]}>
-                                {details}
-                              </Text>
-                            ) : null}
-                            {notes ? (
-                              <Text style={[styles.exerciseNote, { color: Brand.warning }]}>
-                                Obs: {notes}
-                              </Text>
-                            ) : null}
-                          </View>
-                          {videoUrl ? (
-                            <Button
-                              title="Vídeo"
-                              variant="ghost"
-                              onPress={() =>
-                                setVideo({
-                                  title: name,
-                                  url: videoUrl,
-                                  instructions: instructions || null,
-                                })
-                              }
-                              style={styles.videoButton}
-                            />
-                          ) : null}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })}
+              <Text style={[styles.listHint, { color: theme.textSecondary }]}>
+                Os exercícios aparecem ao iniciar o treino.
+              </Text>
 
               <Button title="Iniciar treino" onPress={() => startWorkout(workout)} />
             </Card>
@@ -273,13 +205,6 @@ export default function StudentTrainingsScreen() {
         })
       )}
 
-      <ExerciseVideoModal
-        visible={video !== null}
-        onClose={() => setVideo(null)}
-        title={video?.title ?? ''}
-        videoUrl={video?.url}
-        instructions={video?.instructions}
-      />
     </Screen>
   );
 }
@@ -333,17 +258,18 @@ const styles = StyleSheet.create({
   workoutTitleBox: { flex: 1, gap: 2 },
   workoutName: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3 },
   workoutMeta: { fontSize: 12 },
-  dayBlock: { gap: Spacing.two, paddingTop: Spacing.two, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
-  dayHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  dayBadge: { minWidth: 34, height: 28, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  dayBadgeText: { fontSize: 12, fontWeight: '800' },
-  dayLabel: { fontSize: 12, fontWeight: '600' },
-  exerciseRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  exerciseInfo: { flex: 1, gap: 1 },
-  exerciseName: { fontSize: 14, fontWeight: '700' },
-  exerciseMeta: { fontSize: 12 },
-  exerciseNote: { fontSize: 12, lineHeight: 17 },
-  videoButton: { minHeight: 38, paddingHorizontal: 12 },
+  daySummary: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
+  dayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  dayChipLabel: { fontSize: 12, fontWeight: '800' },
+  dayChipCount: { fontSize: 11, fontWeight: '600' },
+  listHint: { fontSize: 12 },
   fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two },
   fallbackTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
   fallbackText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
