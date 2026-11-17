@@ -527,17 +527,26 @@ export default function WorkoutSessionScreen() {
 
 
   return (
-    <Screen contentStyle={styles.sessionScreen}>
-      <View style={styles.topBar}>
-        <Pressable
-          onPress={handleExit}
-          style={[styles.exitButton, { backgroundColor: theme.primarySoft }]}
-          accessibilityRole="button"
-          accessibilityLabel="Sair do treino">
-          <Ionicons name="arrow-back" size={17} color={Brand.primary} />
-          <Text style={[styles.exitButtonText, { color: Brand.primary }]}>Sair</Text>
-        </Pressable>
-        <View style={styles.topInfo}>
+    <Screen scroll={false} contentStyle={styles.sessionScreen}>
+      <View style={styles.sessionHeader}>
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={handleExit}
+            style={[styles.exitButton, { backgroundColor: theme.primarySoft }]}
+            accessibilityRole="button"
+            accessibilityLabel="Sair do treino">
+            <Ionicons name="arrow-back" size={17} color={Brand.primary} />
+            <Text style={[styles.exitButtonText, { color: Brand.primary }]}>Sair</Text>
+          </Pressable>
+          <View style={[styles.elapsedPill, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name="stopwatch-outline" size={14} color={Brand.primary} />
+            <Text style={[styles.elapsedPillText, { color: Brand.primary }]}>
+              {formatDuration(elapsed)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.workoutTitleRow}>
           <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
             {workout.name}
           </Text>
@@ -545,18 +554,18 @@ export default function WorkoutSessionScreen() {
             {completedCount}/{exercises.length} exercícios marcados
           </Text>
         </View>
-        <View style={[styles.elapsedPill, { backgroundColor: theme.primarySoft }]}>
-          <Ionicons name="stopwatch-outline" size={14} color={Brand.primary} />
-          <Text style={[styles.elapsedPillText, { color: Brand.primary }]}>
-            {formatDuration(elapsed)}
-          </Text>
-        </View>
+
+        <ProgressBar
+          value={exercises.length ? completedCount / exercises.length : 0}
+          height={10}
+        />
       </View>
 
-      <ProgressBar
-        value={exercises.length ? completedCount / exercises.length : 0}
-        height={10}
-      />
+      <ScrollView
+        style={styles.sessionBody}
+        contentContainerStyle={styles.sessionBodyContent}
+        keyboardShouldPersistTaps="handled">
+
 
       {restActive ? (
         <Hero colors={Gradients.accent} contentStyle={styles.restContent}>
@@ -852,13 +861,14 @@ export default function WorkoutSessionScreen() {
           icon="barbell-outline"
           title="Este treino não tem exercícios"
           actionLabel="Voltar"
-          onAction={() => router.back()}
+          onAction={handleExit}
         />
       )}
 
       {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
 
       <Button title="Finalizar treino" onPress={finishWorkout} loading={saving} />
+      </ScrollView>
 
       <ExerciseVideoModal
         visible={video !== null}
@@ -872,29 +882,33 @@ export default function WorkoutSessionScreen() {
 }
 
 const styles = StyleSheet.create({
+  sessionHeader: {
+    gap: Spacing.two,
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Spacing.two,
   },
   exitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 40,
     borderRadius: Radius.full,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
   exitButtonText: {
     fontSize: 13,
     fontWeight: '800',
   },
-  topInfo: {
-    flex: 1,
+  workoutTitleRow: {
     gap: 2,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
@@ -905,9 +919,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 40,
     borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   elapsedPillText: {
     fontSize: 13,
@@ -988,7 +1003,14 @@ const styles = StyleSheet.create({
     minHeight: 42,
   },
   sessionScreen: {
+    paddingHorizontal: Spacing.three,
+  },
+  sessionBody: {
+    flex: 1,
+  },
+  sessionBodyContent: {
     gap: Spacing.two,
+    paddingTop: Spacing.two,
     paddingBottom: Spacing.six,
   },
   exerciseStrip: {
