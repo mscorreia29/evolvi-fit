@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Platform, Pressable, Share, StyleSheet, Text, Vibration, View } from 'react-native';
 
 import { ExerciseVideoModal } from '@/components/exercise-video-modal';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,17 @@ type LogValues = {
   reps: string;
   weight: string;
 };
+
+type FinishResult = {
+  duration: number;
+  calories: number;
+  volumeKg: number;
+};
+
+function firstNumber(value?: string | null) {
+  const match = value?.replace(',', '.').match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
 
 function beginRest(
   seconds: number | null,
@@ -64,7 +75,9 @@ export default function WorkoutSessionScreen() {
   const [logs, setLogs] = useState<Record<string, LogValues>>({});
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
-  const [finishedDuration, setFinishedDuration] = useState<number | null>(null);
+  const [finished, setFinished] = useState<FinishResult | null>(null);
+  const [bodyWeight, setBodyWeight] = useState<number | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const [video, setVideo] = useState<{
     title: string;
     url: string;
@@ -82,14 +95,30 @@ export default function WorkoutSessionScreen() {
     let cancelled = false;
 
     (async () => {
-      const { data, error: loadError } = await supabase
-        .from('workouts')
-        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
-        .eq('id', id)
-        .eq('student_id', profile.id)
-        .maybeSingle();
+      const [workoutRes, assessmentRes] = await Promise.all([
+        supabase
+          .from('workouts')
+          .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
+          .eq('id', id)
+          .eq('student_id', profile.id)
+          .maybeSingle(),
+        supabase
+          .from('physical_assessments')
+          .select('weight_kg')
+          .eq('student_id', profile.id)
+          .not('weight_kg', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const { data, error: loadError } = workoutRes;
 
       if (cancelled) return;
+
+      setBodyWeight(
+        typeof assessmentRes.data?.weight_kg === 'number' ? assessmentRes.data.weight_kg : null,
+      );
 
       if (loadError) {
         setError(loadError.message);
@@ -180,6 +209,18 @@ export default function WorkoutSessionScreen() {
     setError(null);
 
     const duration = Math.floor((Date.now() - startedAt) / 1000);
+    const volumeKg = exercises.reduce((total, exercise) => {
+      const values = logs[exercise.id];
+      const weight = firstNumber(values?.weight);
+      const sets = firstNumber(values?.sets);
+      const reps = firstNumber(values?.reps);
+      if (weight <= 0 || sets <= 0 || reps <= 0) return total;
+      return total + weight * sets * reps;
+    }, 0);
+    const calories = duration > 0
+      ? Math.max(1, Math.round(6 * (bodyWeight ?? 70) * (duration / 3600)))
+      : 0;
+
     const { data: session, error: insertError } = await supabase
       .from('workout_sessions')
       .insert({
@@ -227,7 +268,50 @@ export default function WorkoutSessionScreen() {
     }
 
     setSaving(false);
-    setFinishedDuration(duration);
+    setFinished({ duration, calories, volumeKg });
+  }
+
+  async function handleShareResult() {
+    if (!finished) return;
+
+    const volume = Math.round(finished.volumeKg).toLocaleString('pt-BR');
+    const message = [
+      'Treino concluído no Evolvi Fit!',
+      '',
+      workout?.name ?? 'Treino',
+      `Calorias: ${finished.calories} kcal`,
+      finished.volumeKg > 0 ? `Carga total: ${volume} kg` : null,
+      `Tempo: ${formatDuration(finished.duration)}`,
+      `${completedCount}/${exercises.length} exercícios concluídos`,
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n');
+
+    try {
+      if (Platform.OS === 'web') {
+        const navigator = (globalThis as {
+          navigator?: {
+            share?: (data: { text: string }) => Promise<void>;
+            clipboard?: { writeText: (value: string) => Promise<void> };
+          };
+        }).navigator;
+
+        if (navigator?.share) {
+          await navigator.share({ text: message });
+          return;
+        }
+        if (navigator?.clipboard) {
+          await navigator.clipboard.writeText(message);
+          setShareCopied(true);
+          setTimeout(() => setShareCopied(false), 2500);
+          return;
+        }
+      }
+
+      await Share.share({ message, title: 'Meu treino no Evolvi Fit' });
+    } catch {
+      setShareCopied(false);
+    }
   }
 
   if (loading) {
@@ -250,8 +334,9 @@ export default function WorkoutSessionScreen() {
     );
   }
 
-  if (finishedDuration !== null) {
+  if (finished !== null) {
     const completion = exercises.length ? completedCount / exercises.length : 0;
+    const volume = Math.round(finished.volumeKg).toLocaleString('pt-BR');
 
     return (
       <Screen>
@@ -260,26 +345,67 @@ export default function WorkoutSessionScreen() {
             <Ionicons name="trophy" size={38} color="#FFFFFF" />
           </View>
           <Text style={styles.finishTitle}>Treino concluído!</Text>
-          <Text style={styles.finishTime}>
-            {workout.name} • {formatDuration(finishedDuration)}
-          </Text>
+          <Text style={styles.finishTime}>{workout.name}</Text>
           <ProgressBar value={completion} color="#FFFFFF" style={styles.finishProgress} />
           <Text style={styles.finishMeta}>
             {completedCount} de {exercises.length} exercícios marcados
           </Text>
         </Hero>
 
+        <Card style={styles.resultCard}>
+          <View style={styles.resultHeader}>
+            <Text style={[styles.resultTitle, { color: theme.text }]}>Seu resultado</Text>
+            <Badge label="Sessão registrada" tone="success" />
+          </View>
+
+          <View style={styles.resultGrid}>
+            <View style={styles.resultItem}>
+              <View style={[styles.resultIcon, { backgroundColor: 'rgba(245, 181, 68, 0.14)' }]}>
+                <Ionicons name="flame" size={20} color={Brand.warning} />
+              </View>
+              <Text style={[styles.resultValue, { color: theme.text }]}>{finished.calories}</Text>
+              <Text style={[styles.resultLabel, { color: theme.textSecondary }]}>kcal gastas</Text>
+            </View>
+            <View style={styles.resultItem}>
+              <View style={[styles.resultIcon, { backgroundColor: 'rgba(56, 189, 248, 0.14)' }]}>
+                <Ionicons name="barbell" size={20} color={Brand.accent} />
+              </View>
+              <Text style={[styles.resultValue, { color: theme.text }]}>
+                {finished.volumeKg > 0 ? volume : '—'}
+              </Text>
+              <Text style={[styles.resultLabel, { color: theme.textSecondary }]}>kg levantados</Text>
+            </View>
+            <View style={styles.resultItem}>
+              <View style={[styles.resultIcon, { backgroundColor: 'rgba(62, 207, 142, 0.14)' }]}>
+                <Ionicons name="stopwatch" size={20} color={Brand.primary} />
+              </View>
+              <Text style={[styles.resultValue, { color: theme.text }]}>
+                {formatDuration(finished.duration)}
+              </Text>
+              <Text style={[styles.resultLabel, { color: theme.textSecondary }]}>tempo total</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.resultHint, { color: theme.textSecondary }]}>
+            Calorias estimadas com base no tempo e no seu peso corporal. Carga total calculada pelas
+            cargas registradas.
+          </Text>
+        </Card>
+
         <Card style={styles.finishSummary}>
-          <Badge label="Sessão registrada" tone="success" />
           <Text style={[styles.finishWorkoutName, { color: theme.text }]}>
             Bom trabalho! Descanse e hidrate-se.
           </Text>
           <Text style={[styles.finishSummaryText, { color: theme.textSecondary }]}>
-            Seu personal já pode acompanhar os detalhes desta sessão painel dele.
+            Compartilhe seu resultado e mostre a evolução para a galera.
           </Text>
         </Card>
 
-        <Button title="Ver histórico" onPress={() => router.replace('/aluno/historico' as never)} />
+        <Button
+          title={shareCopied ? 'Resultado copiado!' : 'Compartilhar resultado'}
+          onPress={handleShareResult}
+        />
+        <Button title="Ver histórico" onPress={() => router.replace('/aluno/historico' as never)} variant="secondary" />
         <Button
           title="Voltar aos treinos"
           onPress={() => router.replace('/aluno')}
@@ -761,6 +887,54 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 13,
     fontWeight: '600',
+  },
+  resultCard: {
+    gap: Spacing.three,
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  resultTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  resultGrid: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  resultItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  resultIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  resultValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  resultLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  resultHint: {
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   finishSummary: {
     gap: Spacing.two,
