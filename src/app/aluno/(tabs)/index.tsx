@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ExerciseVideoModal } from '@/components/exercise-video-modal';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,8 +15,9 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { TextField } from '@/components/ui/text-field';
 import { WeeklyChart } from '@/components/ui/weekly-chart';
 import { Images } from '@/constants/images';
-import { Brand, Gradients, Radius, Spacing } from '@/constants/theme';
+import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { resolveBrandCoverUrl } from '@/lib/branding';
 import {
   fetchStudentGoals,
   fetchWeeklyCheckin,
@@ -51,7 +50,7 @@ export default function StudentWorkoutScreen() {
   const [week, setWeek] = useState<WeeklyPoint[]>([]);
   const [weekCount, setWeekCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [video, setVideo] = useState<{ title: string; url: string; instructions?: string | null } | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
   const [goals, setGoals] = useState<StudentGoal[]>([]);
   const [checkin, setCheckin] = useState<WeeklyCheckin | null>(null);
@@ -103,6 +102,7 @@ export default function StudentWorkoutScreen() {
     setWater(waterRes.log);
     setMeals(mealsRes.meals);
     setWeekActivity(activityRes);
+    setCoverUrl(await resolveBrandCoverUrl(profile));
   }, [profile]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -111,10 +111,6 @@ export default function StudentWorkoutScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  }
-
-  function startWorkout(workout: WorkoutWithDays) {
-    router.push(`/aluno/treino/${workout.id}` as never);
   }
 
   async function handleCheckin(value: number) {
@@ -192,7 +188,12 @@ export default function StudentWorkoutScreen() {
         <NotificationBell />
       </View>
 
-      <PhotoHero source={Images.workout} height={260} imagePosition="top" glowColor={Brand.accent}>
+      <PhotoHero
+        source={Images.workout}
+        height={260}
+        imagePosition="top"
+        glowColor={Brand.accent}
+        coverUrl={coverUrl}>
         <View style={styles.heroTop}>
           <View style={styles.heroTexts}>
             <View style={styles.kicker}>
@@ -301,46 +302,25 @@ export default function StudentWorkoutScreen() {
         ))}
       </Card>
 
-      <SectionHeader title="O que seu personal indicou pra hoje" />
+      <SectionHeader title="Treinos" subtitle="Plano montado pelo seu personal" />
 
-      {workouts.length === 0 ? (
-        <Card style={styles.emptyCard}>
-          <LinearGradient colors={Gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyIcon}>
-            <Ionicons name="barbell" size={24} color="#FFFFFF" />
-          </LinearGradient>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>Nenhum treino por aqui</Text>
-          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            Seu personal ainda não montou um treino para você.
-          </Text>
-        </Card>
-      ) : (
-        workouts.slice(0, 1).map((workout) => {
-          const days = [...(workout.workout_days ?? [])].sort((a, b) => a.order_index - b.order_index);
-          const exerciseTotal = days.reduce((sum, day) => sum + (day.workout_exercises?.length ?? 0), 0);
-          const muscleGroups = Array.from(new Set(days.flatMap((d) => d.workout_exercises?.map((e) => e.name.split(' ')[0]) ?? []))).slice(0, 4);
-          return (
-            <Card key={workout.id} style={styles.workoutCard}>
-              <View style={styles.workoutHeader}>
-                <View style={styles.workoutTitleBox}>
-                  <Text style={[styles.workoutName, { color: theme.text }]}>{workout.name}</Text>
-                  <Text style={[styles.workoutMeta, { color: theme.textSecondary }]}>
-                    60 min · {exerciseTotal} exercícios
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.muscleRow}>
-                {muscleGroups.map((m, i) => (
-                  <Badge key={i} label={m} tone="muted" />
-                ))}
-              </View>
-              <View style={styles.workoutActions}>
-                <Button title="Iniciar treino" onPress={() => startWorkout(workout)} />
-                <Button title="Treinar com um amigo" variant="secondary" onPress={() => {}} />
-              </View>
-            </Card>
-          );
-        })
-      )}
+      <Card style={styles.workoutCard}>
+        <View style={styles.workoutHeader}>
+          <View style={styles.workoutTitleBox}>
+            <Text style={[styles.workoutName, { color: theme.text }]}>Seus treinos</Text>
+            <Text style={[styles.workoutMeta, { color: theme.textSecondary }]}>
+              {workouts.length} treino(s) ativo(s)
+            </Text>
+          </View>
+          <View style={[styles.workoutIcon, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name="barbell-outline" size={22} color={Brand.primary} />
+          </View>
+        </View>
+        <Text style={[styles.workoutHint, { color: theme.textSecondary }]}>
+          Veja as divisões, exercícios e observações de cada treino em um só lugar.
+        </Text>
+        <Button title="Abrir treinos" onPress={() => router.push('/aluno/treinos' as never)} />
+      </Card>
 
       <Card style={styles.featureCard}>
         <View style={styles.sectionRow}>
@@ -425,13 +405,6 @@ export default function StudentWorkoutScreen() {
         </Card>
       ) : null}
 
-      <ExerciseVideoModal
-        visible={video !== null}
-        onClose={() => setVideo(null)}
-        title={video?.title ?? ''}
-        videoUrl={video?.url}
-        instructions={video?.instructions}
-      />
     </Screen>
   );
 }
@@ -482,6 +455,8 @@ const styles = StyleSheet.create({
   workoutTitleBox: { flex: 1, gap: 2 },
   workoutName: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3 },
   workoutMeta: { fontSize: 12 },
+  workoutIcon: { width: 42, height: 42, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+  workoutHint: { fontSize: 13, lineHeight: 19 },
   muscleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   workoutActions: { gap: Spacing.two },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

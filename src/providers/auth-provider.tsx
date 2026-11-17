@@ -9,6 +9,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 
+import { resolveBrandCoverUrl } from '@/lib/branding';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Role } from '@/lib/types';
 
@@ -27,6 +28,7 @@ type AuthResult = {
 type AuthContextValue = {
   session: Session | null;
   profile: Profile | null;
+  brandCoverUrl: string | null;
   loading: boolean;
   isAdmin: boolean;
   isTrialExpired: boolean;
@@ -73,6 +75,7 @@ async function loadProfile(user: User): Promise<Profile | null> {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [brandCoverUrl, setBrandCoverUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -90,6 +93,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setLoading(true);
       } else {
         setProfile(null);
+        setBrandCoverUrl(null);
         setLoading(false);
       }
     });
@@ -107,8 +111,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let active = true;
 
     loadProfile(user)
-      .then((nextProfile) => {
-        if (active) setProfile(nextProfile);
+      .then(async (nextProfile) => {
+        if (!active) return;
+        setProfile(nextProfile);
+        const cover = await resolveBrandCoverUrl(nextProfile);
+        if (active) setBrandCoverUrl(cover);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -149,12 +156,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setBrandCoverUrl(null);
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (!session?.user) return;
     const nextProfile = await loadProfile(session.user);
     setProfile(nextProfile);
+    setBrandCoverUrl(await resolveBrandCoverUrl(nextProfile));
   }, [session]);
 
   const isAdmin = profile?.role === 'admin';
@@ -208,6 +217,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     () => ({
       session,
       profile,
+      brandCoverUrl,
       loading,
       isAdmin,
       isTrialExpired,
@@ -222,7 +232,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signOut,
       refreshProfile,
     }),
-    [session, profile, loading, isAdmin, isTrialExpired, accountBlocked, trialDaysLeft, hasAccess, accessExpiresAt, daysUntilExpiry, blockReason, signIn, signUp, signOut, refreshProfile],
+    [session, profile, brandCoverUrl, loading, isAdmin, isTrialExpired, accountBlocked, trialDaysLeft, hasAccess, accessExpiresAt, daysUntilExpiry, blockReason, signIn, signUp, signOut, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

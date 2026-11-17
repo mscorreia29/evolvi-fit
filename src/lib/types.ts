@@ -41,6 +41,7 @@ export type Profile = {
   payment_notes: string | null;
   xp: number;
   notes: string | null;
+  cover_url: string | null;
   created_at: string;
 };
 

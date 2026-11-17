@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -253,6 +255,10 @@ export default function PersonalProfileScreen() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
 
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverMessage, setCoverMessage] = useState<string | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
+
   const [feedbackInterval, setFeedbackInterval] = useState('14');
   const [paymentReminderDays, setPaymentReminderDays] = useState('3');
   const [savingSettings, setSavingSettings] = useState(false);
@@ -334,6 +340,82 @@ export default function PersonalProfileScreen() {
 
     await refreshProfile();
     setProfileMessage('Dados atualizados!');
+  }
+
+  async function handlePickCover() {
+    if (!profile) return;
+
+    setCoverError(null);
+    setCoverMessage(null);
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+
+    setUploadingCover(true);
+
+    try {
+      const extension = asset.mimeType?.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg';
+      const path = `${profile.id}/cover-${Date.now()}.${extension}`;
+      const body =
+        Platform.OS === 'web' && asset.file
+          ? asset.file
+          : await (await fetch(asset.uri)).blob();
+
+      const { error: uploadError } = await supabase.storage.from('branding').upload(path, body, {
+        contentType: asset.mimeType ?? 'image/jpeg',
+        upsert: true,
+      });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ cover_url: publicData.publicUrl })
+        .eq('id', profile.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      await refreshProfile();
+      setCoverMessage('Capa/logo atualizada.');
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : 'Não foi possível salvar a imagem.');
+    } finally {
+      setUploadingCover(false);
+    }
+  }
+
+  async function handleRemoveCover() {
+    if (!profile) return;
+
+    setCoverError(null);
+    setCoverMessage(null);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ cover_url: null })
+      .eq('id', profile.id);
+
+    if (error) {
+      setCoverError(error.message);
+      return;
+    }
+
+    await refreshProfile();
+    setCoverMessage('Capa removida. Voltamos ao padrão.');
   }
 
   async function handleChangePassword() {
@@ -421,6 +503,38 @@ export default function PersonalProfileScreen() {
           </View>
         </View>
       </PhotoHero>
+
+      <Card>
+        <SectionTitle icon="image-outline" title="Identidade visual" />
+        <Text style={[styles.hint, { color: theme.textSecondary }]}>
+          Escolha uma capa com a sua logo. Ela aparece nos painéis do app e na área dos alunos.
+        </Text>
+        <Image
+          source={profile?.cover_url ? { uri: profile.cover_url } : Images.coach}
+          style={styles.coverPreview}
+          contentFit="cover"
+          transition={300}
+        />
+        <View style={styles.coverActions}>
+          <Button
+            title={uploadingCover ? 'Enviando...' : 'Escolher capa/logo'}
+            variant="secondary"
+            onPress={handlePickCover}
+            loading={uploadingCover}
+            style={styles.coverButton}
+          />
+          {profile?.cover_url ? (
+            <Button
+              title="Remover"
+              variant="ghost"
+              onPress={handleRemoveCover}
+              style={styles.coverButton}
+            />
+          ) : null}
+        </View>
+        {coverError ? <Message tone="error">{coverError}</Message> : null}
+        {coverMessage ? <Message tone="success">{coverMessage}</Message> : null}
+      </Card>
 
       <Card>
         <SectionTitle icon="flash-outline" title="Ações rápidas" />
@@ -665,6 +779,18 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 13,
     lineHeight: 19,
+  },
+  coverPreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: Radius.md,
+  },
+  coverActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  coverButton: {
+    flex: 1,
   },
   installGuide: {
     gap: Spacing.two,

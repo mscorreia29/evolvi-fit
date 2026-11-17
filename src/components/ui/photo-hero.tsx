@@ -5,6 +5,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Radius, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/providers/auth-provider';
 
 type PhotoHeroProps = PropsWithChildren<{
   source: ImageProps['source'];
@@ -13,6 +14,7 @@ type PhotoHeroProps = PropsWithChildren<{
   imagePosition?: ImageProps['contentPosition'];
   glowColor?: string;
   fade?: 'soft' | 'strong';
+  coverUrl?: string | null;
 }>;
 
 export function PhotoHero({
@@ -23,8 +25,13 @@ export function PhotoHero({
   imagePosition = 'center',
   glowColor = '#3ECF8E',
   fade = 'strong',
+  coverUrl,
 }: PhotoHeroProps) {
   const theme = useTheme();
+  const { brandCoverUrl } = useAuth();
+
+  const customCover = coverUrl ?? brandCoverUrl;
+  const resolvedSource: ImageProps['source'] = customCover ? { uri: customCover } : source;
 
   return (
     <View
@@ -37,7 +44,7 @@ export function PhotoHero({
         },
       ]}>
       <Image
-        source={source}
+        source={resolvedSource}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
         contentPosition={imagePosition}

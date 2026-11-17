@@ -462,6 +462,19 @@ export default function WorkoutSessionScreen() {
                     </Text>
                   ) : null}
 
+                  {exercise.notes ? (
+                    <View
+                      style={[
+                        styles.noteBox,
+                        { backgroundColor: theme.backgroundSelected, borderColor: theme.border },
+                      ]}>
+                      <Ionicons name="information-circle-outline" size={16} color={Brand.warning} />
+                      <Text style={[styles.noteText, { color: theme.textSecondary }]}>
+                        {exercise.notes}
+                      </Text>
+                    </View>
+                  ) : null}
+
                   <View style={styles.exerciseActions}>
                     {videoUrl ? (
                       <Pressable
@@ -682,6 +695,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   instructions: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  noteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.two,
+  },
+  noteText: {
+    flex: 1,
     fontSize: 12,
     lineHeight: 18,
   },

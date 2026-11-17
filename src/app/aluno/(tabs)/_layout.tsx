@@ -23,7 +23,7 @@ export default function StudentTabsLayout() {
         tabBarActiveTintColor: Brand.primary,
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarHideOnKeyboard: true,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
         tabBarStyle: {
           backgroundColor: theme.backgroundElement,
           borderTopColor: theme.border,
@@ -36,7 +36,15 @@ export default function StudentTabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Treino',
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) =>
+            iconWrapper(focused, focused ? 'home' : 'home-outline', color),
+        }}
+      />
+      <Tabs.Screen
+        name="treinos"
+        options={{
+          title: 'Treinos',
           tabBarIcon: ({ color, focused }) =>
             iconWrapper(focused, focused ? 'barbell' : 'barbell-outline', color),
         }}
@@ -87,7 +95,7 @@ export default function StudentTabsLayout() {
 
 const styles = StyleSheet.create({
   iconWrap: {
-    width: 44,
+    width: 38,
     height: 30,
     borderRadius: Radius.full,
     alignItems: 'center',

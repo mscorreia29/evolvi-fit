@@ -42,7 +42,15 @@
         }
       ],
       "expo-video",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permita o Evolvi Fit acessar suas fotos para definir a capa do app.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

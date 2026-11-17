@@ -28,6 +28,7 @@ type ExerciseInput = {
   exerciseId: string | null;
   videoUrl: string | null;
   instructions: string | null;
+  notes: string | null;
 };
 
 type DayInput = {
@@ -46,6 +47,7 @@ function emptyExercise(key: number): ExerciseInput {
     exerciseId: null,
     videoUrl: null,
     instructions: null,
+    notes: null,
   };
 }
 
@@ -165,6 +167,7 @@ export default function NewWorkoutScreen() {
             exerciseId: exercise.exercise_id,
             videoUrl: exercise.video_url ?? exercise.exercise?.video_url ?? null,
             instructions: exercise.instructions ?? exercise.exercise?.instructions ?? null,
+            notes: exercise.notes ?? null,
           })),
       }));
 
@@ -206,7 +209,7 @@ export default function NewWorkoutScreen() {
   function updateExercise(
     dayKey: number,
     exerciseKey: number,
-    field: 'name' | 'sets' | 'reps' | 'rest' | 'videoUrl',
+    field: 'name' | 'sets' | 'reps' | 'rest' | 'videoUrl' | 'notes',
     value: string,
   ) {
     setDays((prev) =>
@@ -215,9 +218,7 @@ export default function NewWorkoutScreen() {
           ? {
               ...day,
               exercises: day.exercises.map((exercise) =>
-                exercise.key === exerciseKey
-                  ? { ...exercise, [field === 'videoUrl' ? 'videoUrl' : field]: value }
-                  : exercise,
+                exercise.key === exerciseKey ? { ...exercise, [field]: value } : exercise,
               ),
             }
           : day,
@@ -301,6 +302,7 @@ export default function NewWorkoutScreen() {
       exerciseId: item.id,
       videoUrl: item.video_url,
       instructions: item.instructions,
+      notes: null,
     };
 
     setDays((prev) => {
@@ -413,6 +415,7 @@ export default function NewWorkoutScreen() {
           reps: exercise.reps.trim() || null,
           rest_seconds: Number(exercise.rest) || null,
           video_url: exercise.videoUrl?.trim() || null,
+          notes: exercise.notes?.trim() || null,
           order_index: index,
         }));
 
@@ -675,6 +678,15 @@ export default function NewWorkoutScreen() {
                   />
                 </View>
               </View>
+
+              <TextField
+                label="Observação (opcional)"
+                value={exercise.notes ?? ''}
+                onChangeText={(value) => updateExercise(day.key, exercise.key, 'notes', value)}
+                placeholder="Ex: manter o core firme e descer devagar"
+                multiline
+                style={styles.notesInput}
+              />
             </View>
           ))}
 
@@ -970,6 +982,11 @@ const styles = StyleSheet.create({
   },
   rowItem: {
     flex: 1,
+  },
+  notesInput: {
+    minHeight: 80,
+    lineHeight: 20,
+    textAlignVertical: 'top',
   },
   dayButtons: {
     flexDirection: 'row',
