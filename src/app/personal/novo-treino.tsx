@@ -562,7 +562,7 @@ export default function NewWorkoutScreen() {
         <View style={styles.heroStats}>
           <View style={styles.heroPill}>
             <Ionicons name="layers-outline" size={14} color="#FFFFFF" />
-            <Text style={styles.heroPillText}>{days.length} divisões</Text>
+            <Text style={styles.heroPillText}>{days.length} treinos</Text>
           </View>
           <View style={styles.heroPill}>
             <Ionicons name="fitness-outline" size={14} color="#FFFFFF" />
@@ -670,7 +670,7 @@ export default function NewWorkoutScreen() {
         </Card>
       ) : null}
 
-      <SectionHeader title="Divisões" subtitle={`${days.length} dia(s) • ${totalExercises} exercícios`} />
+      <SectionHeader title="Treinos" subtitle={`${days.length} treino(s) • ${totalExercises} exercícios`} />
 
       {days.map((day, dayIndex) => (
         <Card key={day.key} style={styles.dayCard}>
@@ -684,10 +684,10 @@ export default function NewWorkoutScreen() {
             </LinearGradient>
             <View style={styles.dayLabel}>
               <TextField
-                label={`Divisão ${dayIndex + 1}`}
+                label={`Treino ${dayIndex + 1}`}
                 value={day.label}
                 onChangeText={(value) => updateDay(day.key, { label: value })}
-                placeholder="A, B, Peito..."
+                placeholder="A, B, C..."
                 autoCorrect={false}
                 spellCheck={false}
               />
@@ -870,7 +870,7 @@ export default function NewWorkoutScreen() {
       ))}
 
       <Button
-        title="+ Adicionar divisão (B, C...)"
+        title="+ Adicionar treino (B, C...)"
         variant="secondary"
         onPress={addDay}
       />

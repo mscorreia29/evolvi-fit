@@ -1,8 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, Share, StyleSheet, Text, Vibration, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  type ScrollViewInstance,
+  useWindowDimensions,
+  Vibration,
+  View,
+} from 'react-native';
 
 import { ExerciseVideoModal } from '@/components/exercise-video-modal';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +25,7 @@ import { Loading } from '@/components/ui/loading';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { Brand, Gradients, Radius, Spacing } from '@/constants/theme';
+import { Brand, Gradients, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getExerciseCategory, isCardioCategory } from '@/lib/exercises';
 import { formatDuration } from '@/lib/format';
@@ -60,6 +71,53 @@ function extendRest(
   setEndsAt((prev) => (prev ? prev + seconds * 1000 : current + seconds * 1000));
 }
 
+function exerciseVideoUrl(exercise: WorkoutExercise) {
+  const url = exercise.video_url ?? exercise.exercise?.video_url ?? null;
+  return typeof url === 'string' && url ? url : null;
+}
+
+function exerciseInstructions(exercise: WorkoutExercise) {
+  const value = exercise.instructions ?? exercise.exercise?.instructions ?? null;
+  return typeof value === 'string' && value ? value : null;
+}
+
+function exerciseDetails(exercise: WorkoutExercise) {
+  const cardio = isCardioCategory(getExerciseCategory(exercise.exercise));
+  return cardio
+    ? [
+        exercise.sets ? `${exercise.sets} bloco(s)` : null,
+        exercise.reps,
+        exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
+      ]
+        .filter(Boolean)
+        .join(' • ')
+    : [
+        exercise.sets ? `${exercise.sets} séries` : null,
+        exercise.reps ? `${exercise.reps} reps` : null,
+        exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
+      ]
+        .filter(Boolean)
+        .join(' • ');
+}
+
+function InlineExerciseVideo({ url, title }: { url: string; title: string }) {
+  const player = useVideoPlayer(url, (instance) => {
+    instance.loop = true;
+  });
+
+  return (
+    <View style={styles.inlineVideoWrap} accessibilityLabel={`Vídeo de ${title}`}>
+      <VideoView
+        player={player}
+        style={styles.inlineVideo}
+        contentFit="contain"
+        fullscreenOptions={{ enable: true }}
+        nativeControls
+      />
+    </View>
+  );
+}
+
 export default function WorkoutSessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -84,6 +142,10 @@ export default function WorkoutSessionScreen() {
     url: string;
     instructions?: string | null;
   } | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const pagerRef = useRef<ScrollViewInstance | null>(null);
+  const { width } = useWindowDimensions();
+  const pageWidth = Math.max(240, Math.min(width, MaxContentWidth) - Spacing.three * 2);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -162,6 +224,21 @@ export default function WorkoutSessionScreen() {
     [days],
   );
 
+  const exerciseDayLabels = useMemo(() => {
+    const labels: Record<string, string> = {};
+    days.forEach((day) => {
+      day.workout_exercises?.forEach((exercise) => {
+        labels[exercise.id] = day.label;
+      });
+    });
+    return labels;
+  }, [days]);
+
+  const activeExercise = exercises[activeIndex] ?? exercises[0] ?? null;
+  const activeVideoUrl = activeExercise ? exerciseVideoUrl(activeExercise) : null;
+  const activeInstructions = activeExercise ? exerciseInstructions(activeExercise) : null;
+  const activeDetails = activeExercise ? exerciseDetails(activeExercise) : '';
+
   const elapsed = Math.floor((now - startedAt) / 1000);
   const restRemaining = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
   const restActive = restEndsAt !== null && restRemaining > 0;
@@ -201,6 +278,12 @@ export default function WorkoutSessionScreen() {
 
   function handleAddRest(seconds: number) {
     extendRest(seconds, setNow, setRestEndsAt);
+  }
+
+  function goToExercise(index: number) {
+    const next = Math.max(0, Math.min(exercises.length - 1, index));
+    setActiveIndex(next);
+    pagerRef.current?.scrollTo({ x: next * pageWidth, animated: true });
   }
 
   async function finishWorkout() {
@@ -414,7 +497,8 @@ export default function WorkoutSessionScreen() {
 
 
   return (
-    <Screen>
+    <Screen scroll={false} contentStyle={styles.sessionScreen}>
+      <View style={styles.sessionRoot}>
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="Voltar">
           <Ionicons name="arrow-back" size={24} color={theme.text} />
@@ -440,22 +524,6 @@ export default function WorkoutSessionScreen() {
         height={10}
       />
 
-      <Hero contentStyle={styles.timerContent}>
-        <View style={styles.timerTop}>
-          <View style={styles.timerLabelRow}>
-            <Ionicons name="stopwatch-outline" size={16} color="rgba(255, 255, 255, 0.85)" />
-            <Text style={styles.timerLabel}>TEMPO DE TREINO</Text>
-          </View>
-          <View style={styles.timerBadge}>
-            <Text style={styles.timerBadgeText}>{days.length} divisões</Text>
-          </View>
-        </View>
-        <Text style={styles.timerValue}>{formatDuration(elapsed)}</Text>
-        <Text style={styles.timerHint}>
-          {completedCount} de {exercises.length} exercícios concluídos
-        </Text>
-      </Hero>
-
       {restActive ? (
         <Hero colors={Gradients.accent} contentStyle={styles.restContent}>
           <View style={styles.restHeader}>
@@ -480,188 +548,277 @@ export default function WorkoutSessionScreen() {
         </Hero>
       ) : null}
 
-      {days.map((day, dayIndex) => {
-        const dayExercises = [...(day.workout_exercises ?? [])].sort(
-          (a, b) => a.order_index - b.order_index,
-        );
-        return (
-          <View key={day.id} style={styles.day}>
-            <View style={styles.dayHeader}>
-              <LinearGradient
-                colors={dayIndex % 2 === 0 ? Gradients.primary : Gradients.accent}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.dayBadge}>
-                <Text style={styles.dayBadgeText}>{day.label}</Text>
-              </LinearGradient>
-              <Text style={[styles.dayCount, { color: theme.textSecondary }]}>
-                {dayExercises.length} exercício(s)
+      {activeExercise ? (
+        <>
+          <View style={styles.currentExerciseHeader}>
+            <View
+              style={[
+                styles.currentIndex,
+                {
+                  backgroundColor: done[activeExercise.id]
+                    ? theme.successSoft
+                    : theme.primarySoft,
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.currentIndexText,
+                  { color: done[activeExercise.id] ? Brand.success : Brand.primary },
+                ]}>
+                {String(activeIndex + 1).padStart(2, '0')}
               </Text>
             </View>
+            <View style={styles.currentTexts}>
+              <Text style={[styles.currentExerciseName, { color: theme.text }]}>
+                {activeExercise.name}
+              </Text>
+              <Text style={[styles.currentExerciseMeta, { color: theme.textSecondary }]}>
+                Treino {exerciseDayLabels[activeExercise.id] ?? 'A'} · {activeDetails}
+              </Text>
+              {activeInstructions ? (
+                <Text style={[styles.currentInstruction, { color: theme.textSecondary }]} numberOfLines={2}>
+                  {activeInstructions}
+                </Text>
+              ) : null}
+            </View>
+            <Pressable
+              onPress={() => handleToggleDone(activeExercise)}
+              accessibilityLabel={done[activeExercise.id] ? 'Marcar como pendente' : 'Marcar como concluído'}
+              hitSlop={8}>
+              <Ionicons
+                name={done[activeExercise.id] ? 'checkmark-circle' : 'ellipse-outline'}
+                size={30}
+                color={done[activeExercise.id] ? Brand.success : theme.textSecondary}
+              />
+            </Pressable>
+          </View>
 
-            {dayExercises.map((exercise, exerciseIndex) => {
+          {activeVideoUrl ? (
+            <InlineExerciseVideo
+              key={activeVideoUrl}
+              url={activeVideoUrl}
+              title={activeExercise.name}
+            />
+          ) : (
+            <Card style={styles.noVideoCard}>
+              <Ionicons name="videocam-off-outline" size={20} color={theme.textSecondary} />
+              <Text style={[styles.noVideoText, { color: theme.textSecondary }]}>
+                Vídeo indisponível para este exercício.
+              </Text>
+            </Card>
+          )}
+
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            keyboardShouldPersistTaps="handled"
+            onScroll={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+              const next = Math.max(0, Math.min(exercises.length - 1, index));
+              setActiveIndex((prev) => (prev === next ? prev : next));
+            }}
+            style={styles.pager}
+            contentContainerStyle={styles.pagerContent}>
+            {exercises.map((exercise, index) => {
               const isDone = !!done[exercise.id];
-              const videoUrl = exercise.video_url ?? exercise.exercise?.video_url ?? null;
-              const instructions = exercise.exercise?.instructions ?? null;
+              const videoUrl = exerciseVideoUrl(exercise);
+              const instructions = exerciseInstructions(exercise);
               const values = logs[exercise.id] ?? { sets: '', reps: '', weight: '' };
-              const category = getExerciseCategory(exercise.exercise);
-              const cardio = isCardioCategory(category);
-              const details = cardio
-                ? [
-                    exercise.sets ? `${exercise.sets} bloco(s)` : null,
-                    exercise.reps,
-                    exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' • ')
-                : [
-                    exercise.sets ? `${exercise.sets} séries` : null,
-                    exercise.reps ? `${exercise.reps} reps` : null,
-                    exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' • ');
+              const cardio = isCardioCategory(getExerciseCategory(exercise.exercise));
+              const details = exerciseDetails(exercise);
 
               return (
-                <Card
-                  key={exercise.id}
-                  style={[styles.exerciseCard, isDone && styles.exerciseCardDone]}>
-                  <Pressable onPress={() => handleToggleDone(exercise)} style={styles.exerciseCheckRow}>
-                    <View
-                      style={[
-                        styles.exerciseIndex,
-                        { backgroundColor: isDone ? theme.successSoft : theme.primarySoft },
-                      ]}>
-                      <Text
+                <View key={exercise.id} style={[styles.page, { width: pageWidth }]}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={styles.pageContent}>
+                  <Card style={[styles.exerciseCard, isDone && styles.exerciseCardDone]}>
+                    <Pressable
+                      onPress={() => goToExercise(index)}
+                      style={styles.exerciseCheckRow}>
+                      <View
                         style={[
-                          styles.exerciseIndexText,
-                          { color: isDone ? Brand.success : Brand.primary },
+                          styles.exerciseIndex,
+                          {
+                            backgroundColor: isDone ? theme.successSoft : theme.primarySoft,
+                          },
                         ]}>
-                        {String(exerciseIndex + 1).padStart(2, '0')}
-                      </Text>
-                    </View>
-                    <View style={styles.exerciseInfo}>
-                      <Text
-                        style={[
-                          styles.exerciseName,
-                          { color: theme.text },
-                          isDone && styles.exerciseNameDone,
-                        ]}>
-                        {exercise.name}
-                      </Text>
-                      {details ? (
-                        <Text style={[styles.exerciseDetails, { color: theme.textSecondary }]}>
-                          {details}
+                        <Text
+                          style={[
+                            styles.exerciseIndexText,
+                            { color: isDone ? Brand.success : Brand.primary },
+                          ]}>
+                          {String(index + 1).padStart(2, '0')}
                         </Text>
+                      </View>
+                      <View style={styles.exerciseInfo}>
+                        <Text
+                          style={[
+                            styles.exerciseName,
+                            { color: theme.text },
+                            isDone && styles.exerciseNameDone,
+                          ]}>
+                          {exercise.name}
+                        </Text>
+                        {details ? (
+                          <Text style={[styles.exerciseDetails, { color: theme.textSecondary }]}>
+                            {details}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Ionicons
+                        name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={26}
+                        color={isDone ? Brand.success : theme.textSecondary}
+                      />
+                    </Pressable>
+
+                    {cardio ? (
+                      <View style={styles.logRow}>
+                        <View style={styles.logField}>
+                          <TextField
+                            label="Blocos"
+                            value={values.sets}
+                            onChangeText={(value) => setLog(exercise.id, 'sets', value)}
+                            keyboardType="number-pad"
+                          />
+                        </View>
+                        <View style={styles.logFieldWide}>
+                          <TextField
+                            label="Duração / distância"
+                            value={values.reps}
+                            onChangeText={(value) => setLog(exercise.id, 'reps', value)}
+                          />
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={styles.logRow}>
+                        <View style={styles.logField}>
+                          <TextField
+                            label="Séries"
+                            value={values.sets}
+                            onChangeText={(value) => setLog(exercise.id, 'sets', value)}
+                            keyboardType="number-pad"
+                          />
+                        </View>
+                        <View style={styles.logField}>
+                          <TextField
+                            label="Reps"
+                            value={values.reps}
+                            onChangeText={(value) => setLog(exercise.id, 'reps', value)}
+                          />
+                        </View>
+                        <View style={styles.logField}>
+                          <TextField
+                            label="Carga (kg)"
+                            value={values.weight}
+                            onChangeText={(value) => setLog(exercise.id, 'weight', value)}
+                            keyboardType="decimal-pad"
+                            placeholder="0"
+                          />
+                        </View>
+                      </View>
+                    )}
+
+                    {instructions ? (
+                      <Text style={[styles.instructions, { color: theme.textSecondary }]}>
+                        {instructions}
+                      </Text>
+                    ) : null}
+
+                    {exercise.notes ? (
+                      <View
+                        style={[
+                          styles.noteBox,
+                          {
+                            backgroundColor: theme.backgroundSelected,
+                            borderColor: theme.border,
+                          },
+                        ]}>
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={16}
+                          color={Brand.warning}
+                        />
+                        <Text style={[styles.noteText, { color: theme.textSecondary }]}>
+                          {exercise.notes}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    <View style={styles.exerciseActions}>
+                      {videoUrl ? (
+                        <Pressable
+                          onPress={() =>
+                            setVideo({
+                              title: exercise.name,
+                              url: videoUrl,
+                              instructions,
+                            })
+                          }
+                          style={styles.action}>
+                          <Ionicons name="expand-outline" size={18} color={Brand.primary} />
+                          <Text style={[styles.actionText, { color: Brand.primary }]}>
+                            Ampliar vídeo
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      {(exercise.rest_seconds ?? 0) > 0 ? (
+                        <Pressable
+                          onPress={() => handleStartRest(exercise.rest_seconds)}
+                          style={styles.action}>
+                          <Ionicons name="timer-outline" size={18} color={theme.text} />
+                          <Text style={[styles.actionText, { color: theme.text }]}>
+                            Descanso {exercise.rest_seconds ?? 60}s
+                          </Text>
+                        </Pressable>
                       ) : null}
                     </View>
-                    <Ionicons
-                      name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={26}
-                      color={isDone ? Brand.success : theme.textSecondary}
-                    />
-                  </Pressable>
-
-                  {cardio ? (
-                    <View style={styles.logRow}>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Blocos"
-                          value={values.sets}
-                          onChangeText={(value) => setLog(exercise.id, 'sets', value)}
-                          keyboardType="number-pad"
-                        />
-                      </View>
-                      <View style={styles.logFieldWide}>
-                        <TextField
-                          label="Duração / distância"
-                          value={values.reps}
-                          onChangeText={(value) => setLog(exercise.id, 'reps', value)}
-                        />
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.logRow}>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Séries"
-                          value={values.sets}
-                          onChangeText={(value) => setLog(exercise.id, 'sets', value)}
-                          keyboardType="number-pad"
-                        />
-                      </View>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Reps"
-                          value={values.reps}
-                          onChangeText={(value) => setLog(exercise.id, 'reps', value)}
-                        />
-                      </View>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Carga (kg)"
-                          value={values.weight}
-                          onChangeText={(value) => setLog(exercise.id, 'weight', value)}
-                          keyboardType="decimal-pad"
-                          placeholder="0"
-                        />
-                      </View>
-                    </View>
-                  )}
-
-                  {instructions ? (
-                    <Text style={[styles.instructions, { color: theme.textSecondary }]}>
-                      {instructions}
-                    </Text>
-                  ) : null}
-
-                  {exercise.notes ? (
-                    <View
-                      style={[
-                        styles.noteBox,
-                        { backgroundColor: theme.backgroundSelected, borderColor: theme.border },
-                      ]}>
-                      <Ionicons name="information-circle-outline" size={16} color={Brand.warning} />
-                      <Text style={[styles.noteText, { color: theme.textSecondary }]}>
-                        {exercise.notes}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.exerciseActions}>
-                    {videoUrl ? (
-                      <Pressable
-                        onPress={() =>
-                          setVideo({
-                            title: exercise.name,
-                            url: videoUrl,
-                            instructions,
-                          })
-                        }
-                        style={styles.action}>
-                        <Ionicons name="play-circle" size={18} color={Brand.primary} />
-                        <Text style={[styles.actionText, { color: Brand.primary }]}>Ver vídeo</Text>
-                      </Pressable>
-                    ) : null}
-                    {(exercise.rest_seconds ?? 0) > 0 ? (
-                      <Pressable onPress={() => handleStartRest(exercise.rest_seconds)} style={styles.action}>
-                        <Ionicons name="timer-outline" size={18} color={theme.text} />
-                        <Text style={[styles.actionText, { color: theme.text }]}>
-                          Descanso {exercise.rest_seconds ?? 60}s
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                </Card>
+                  </Card>
+                  </ScrollView>
+                </View>
               );
             })}
+          </ScrollView>
+
+          <View style={styles.pagerControls}>
+            <Button
+              title="Anterior"
+              variant="secondary"
+              disabled={activeIndex === 0}
+              onPress={() => goToExercise(activeIndex - 1)}
+              style={styles.pagerButton}
+            />
+            <Text style={[styles.pagerCount, { color: theme.textSecondary }]}>
+              {activeIndex + 1} / {exercises.length}
+            </Text>
+            <Button
+              title="Próximo"
+              variant="secondary"
+              disabled={activeIndex === exercises.length - 1}
+              onPress={() => goToExercise(activeIndex + 1)}
+              style={styles.pagerButton}
+            />
           </View>
-        );
-      })}
+        </>
+      ) : (
+        <EmptyState
+          icon="barbell-outline"
+          title="Este treino não tem exercícios"
+          actionLabel="Voltar"
+          onAction={() => router.back()}
+        />
+      )}
 
       {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
 
       <Button title="Finalizar treino" onPress={finishWorkout} loading={saving} />
+      </View>
 
       <ExerciseVideoModal
         visible={video !== null}
@@ -781,29 +938,91 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 42,
   },
-  day: {
+  sessionScreen: {
+    paddingHorizontal: Spacing.three,
+  },
+  sessionRoot: {
+    flex: 1,
     gap: Spacing.two,
   },
-  dayHeader: {
+  currentExerciseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  dayBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.sm,
+  currentIndex: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayBadgeText: {
-    color: '#04140D',
-    fontSize: 13,
+  currentIndexText: {
+    fontSize: 14,
     fontWeight: '800',
   },
-  dayCount: {
+  currentTexts: {
+    flex: 1,
+    gap: 2,
+  },
+  currentExerciseName: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  currentExerciseMeta: {
     fontSize: 12,
-    fontWeight: '600',
+  },
+  currentInstruction: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  inlineVideoWrap: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#000000',
+    overflow: 'hidden',
+  },
+  inlineVideo: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  noVideoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  noVideoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  pager: {
+    flex: 1,
+  },
+  pagerContent: {
+    alignItems: 'stretch',
+  },
+  page: {
+    height: '100%',
+  },
+  pageContent: {
+    paddingBottom: Spacing.two,
+  },
+  pagerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  pagerButton: {
+    flex: 1,
+    minHeight: 44,
+  },
+  pagerCount: {
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   exerciseCard: {
     gap: Spacing.two,
