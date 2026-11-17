@@ -221,7 +221,7 @@ export default function PersonalDashboard() {
       <View style={styles.grid}>
         <StatTile icon="people" label="Alunos" value={students.length} tone="primary" />
         <StatTile icon="barbell" label="Treinos ativos" value={activeWorkouts} tone="accent" />
-        <StatTile icon="flame" label="Sessões (7 dias)" value={weekCount} tone="warning" />
+        <StatTile icon="pulse" label="Alunos ativos (7d)" value={activeStudents} tone="warning" />
         <StatTile icon="checkmark-done" label="Sessões totais" value={sessionCount} tone="success" />
         <StatTile icon="person-add" label="Novos (sem registro)" value={neverTrained.length} tone="accent" />
       </View>
@@ -284,28 +284,6 @@ export default function PersonalDashboard() {
         )
       ) : null}
 
-      <Card style={styles.featureCard}>
-        <SectionHeader title="Resumo da semana" subtitle="Sua atividade recente" />
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{weekCount}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>sessões</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{activeStudents}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>alunos ativos</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: theme.text }]}>{students.length}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>alunos total</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: Brand.warning }]}>R$ {pendingDuesAmount.toFixed(0)}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>a receber</Text>
-          </View>
-        </View>
-      </Card>
-
       {(unreadMessages > 0 || openFeedbacks > 0 || pendingDues > 0 || (profile?.status === 'approved' && daysUntilExpiry != null && daysUntilExpiry <= 7)) ? (
         <Card style={styles.featureCard}>
           <SectionHeader title="Alertas" subtitle="Itens que precisam de atenção" />
@@ -344,7 +322,7 @@ export default function PersonalDashboard() {
         {[
           { icon: 'chatbubbles-outline' as const, label: 'Mensagens', sub: unreadMessages ? `${unreadMessages} não lida(s)` : 'Chat com alunos', href: '/personal/mensagens', alert: unreadMessages },
           { icon: 'chatbox-ellipses-outline' as const, label: 'Feedbacks', sub: openFeedbacks ? `${openFeedbacks} novo(s)` : 'Solicitações', href: '/personal/feedbacks', alert: openFeedbacks },
-          { icon: 'card-outline' as const, label: 'Financeiro', sub: pendingDues ? `${pendingDues} pendente(s)` : 'Mensalidades', href: '/personal/financeiro', alert: pendingDues },
+          { icon: 'card-outline' as const, label: 'Financeiro', sub: pendingDues ? `R$ ${pendingDuesAmount.toFixed(0)} em aberto` : 'Mensalidades', href: '/personal/financeiro', alert: pendingDues },
         ].map((item) => (
           <Pressable
             key={item.label}

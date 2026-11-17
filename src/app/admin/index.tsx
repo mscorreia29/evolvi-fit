@@ -38,11 +38,27 @@ export default function AdminDashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('admin_overview').select('*').maybeSingle();
-    setOverview((data as Overview | null) ?? null);
-    setLoading(false);
+    try {
+      const { data, error: loadError } = await supabase
+        .from('admin_overview')
+        .select('*')
+        .maybeSingle();
+      if (loadError) {
+        setError(loadError.message);
+        setOverview(null);
+        return;
+      }
+      setError(null);
+      setOverview((data as Overview | null) ?? null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar o painel.');
+      setOverview(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -69,7 +85,6 @@ export default function AdminDashboard() {
     personals_approved: 0,
     personals_rejected: 0,
     personals_pending: 0,
-    personals_blocked: 0,
     alunos_total: 0,
     usuarios_total: 0,
     pending_dues_count: 0,
@@ -93,32 +108,43 @@ export default function AdminDashboard() {
         </View>
       </PhotoHero>
 
-      <View style={styles.grid}>
-        <Card style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Brand.primary }]}>{o.personals_approved}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Personais aprovados</Text>
+      {error ? (
+        <Card style={styles.errorCard}>
+          <Ionicons name="alert-circle-outline" size={24} color={Brand.danger} />
+          <View style={styles.errorInfo}>
+            <Text style={[styles.errorTitle, { color: theme.text }]}>Dados indisponíveis</Text>
+            <Text style={[styles.errorText, { color: theme.textSecondary }]}>{error}</Text>
+          </View>
+          <Button title="Tentar novamente" variant="secondary" onPress={handleRefresh} loading={refreshing} />
         </Card>
-        <Card style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Brand.warning }]}>{o.personals_trial}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Em teste (7 dias)</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Brand.danger }]}>{o.personals_pending + o.personals_rejected}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Pendentes/Rejeitados</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Brand.danger }]}>{o.blocked_count}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Bloqueados</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Brand.success }]}>{o.alunos_total}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Alunos</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={[styles.statValue, { color: Brand.warning }]}>R$ {Number(o.pending_dues_amount).toFixed(0)}</Text>
-          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>A receber ({o.pending_dues_count})</Text>
-        </Card>
-      </View>
+      ) : (
+        <View style={styles.grid}>
+          <Card style={styles.statCard}>
+            <Text style={[styles.statValue, { color: Brand.primary }]}>{o.personals_approved}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Personais aprovados</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={[styles.statValue, { color: Brand.warning }]}>{o.personals_trial}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Em teste</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={[styles.statValue, { color: Brand.danger }]}>{o.personals_pending + o.personals_rejected}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Pendentes/rejeitados</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={[styles.statValue, { color: Brand.danger }]}>{o.blocked_count}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Bloqueados</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={[styles.statValue, { color: Brand.success }]}>{o.alunos_total}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Alunos</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={[styles.statValue, { color: Brand.warning }]}>R$ {Number(o.pending_dues_amount).toFixed(0)}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>A receber ({o.pending_dues_count})</Text>
+          </Card>
+        </View>
+      )}
 
       <Card>
         <SectionHeader title="Ações rápidas" />
@@ -156,25 +182,27 @@ export default function AdminDashboard() {
         </View>
       </Card>
 
-      <Card>
-        <SectionHeader title="Resumo" subtitle={`${o.usuarios_total} usuários no total`} />
-        <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais aprovados</Text>
-          <Badge label={String(o.personals_approved)} tone="success" />
-        </View>
-        <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais em teste</Text>
-          <Badge label={String(o.personals_trial)} tone="warning" />
-        </View>
-        <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais bloqueados</Text>
-          <Badge label={String(o.blocked_count)} tone="danger" />
-        </View>
-        <View style={styles.row}>
-          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Ações registradas</Text>
-          <Badge label={String(o.audit_count)} tone="muted" />
-        </View>
-      </Card>
+      {!error ? (
+        <Card>
+          <SectionHeader title="Resumo" subtitle={`${o.usuarios_total} usuários no total`} />
+          <View style={styles.row}>
+            <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais aprovados</Text>
+            <Badge label={String(o.personals_approved)} tone="success" />
+          </View>
+          <View style={styles.row}>
+            <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais em teste</Text>
+            <Badge label={String(o.personals_trial)} tone="warning" />
+          </View>
+          <View style={styles.row}>
+            <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Personais bloqueados</Text>
+            <Badge label={String(o.blocked_count)} tone="danger" />
+          </View>
+          <View style={styles.row}>
+            <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Ações registradas</Text>
+            <Badge label={String(o.audit_count)} tone="muted" />
+          </View>
+        </Card>
+      ) : null}
 
       <Button title="Sair da conta" onPress={handleSignOut} variant="danger" />
     </Screen>
@@ -210,6 +238,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+  },
+  errorCard: {
+    gap: Spacing.two,
+    borderColor: Brand.danger,
+  },
+  errorInfo: {
+    gap: 2,
+  },
+  errorTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   statCard: {
     flexBasis: '47%',

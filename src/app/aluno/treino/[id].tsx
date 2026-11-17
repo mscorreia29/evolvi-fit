@@ -16,6 +16,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { Brand, Gradients, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { getExerciseCategory, isCardioCategory } from '@/lib/exercises';
 import { formatDuration } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { WorkoutExercise, WorkoutWithDays } from '@/lib/types';
@@ -98,7 +99,7 @@ export default function WorkoutSessionScreen() {
       const [workoutRes, assessmentRes] = await Promise.all([
         supabase
           .from('workouts')
-          .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
+          .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions, muscle_group)))')
           .eq('id', id)
           .eq('student_id', profile.id)
           .maybeSingle(),
@@ -189,7 +190,7 @@ export default function WorkoutSessionScreen() {
   function handleToggleDone(exercise: WorkoutExercise) {
     const next = !done[exercise.id];
     setDone((prev) => ({ ...prev, [exercise.id]: next }));
-    if (next) {
+    if (next && exercise.rest_seconds !== 0) {
       handleStartRest(exercise.rest_seconds);
     }
   }
@@ -503,13 +504,23 @@ export default function WorkoutSessionScreen() {
               const videoUrl = exercise.video_url ?? exercise.exercise?.video_url ?? null;
               const instructions = exercise.exercise?.instructions ?? null;
               const values = logs[exercise.id] ?? { sets: '', reps: '', weight: '' };
-              const details = [
-                exercise.sets ? `${exercise.sets} séries` : null,
-                exercise.reps ? `${exercise.reps} reps` : null,
-                exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
-              ]
-                .filter(Boolean)
-                .join(' • ');
+              const category = getExerciseCategory(exercise.exercise);
+              const cardio = isCardioCategory(category);
+              const details = cardio
+                ? [
+                    exercise.sets ? `${exercise.sets} bloco(s)` : null,
+                    exercise.reps,
+                    exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')
+                : [
+                    exercise.sets ? `${exercise.sets} séries` : null,
+                    exercise.reps ? `${exercise.reps} reps` : null,
+                    exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ');
 
               return (
                 <Card
@@ -551,32 +562,52 @@ export default function WorkoutSessionScreen() {
                     />
                   </Pressable>
 
-                  <View style={styles.logRow}>
-                    <View style={styles.logField}>
-                      <TextField
-                        label="Séries"
-                        value={values.sets}
-                        onChangeText={(value) => setLog(exercise.id, 'sets', value)}
-                        keyboardType="number-pad"
-                      />
+                  {cardio ? (
+                    <View style={styles.logRow}>
+                      <View style={styles.logField}>
+                        <TextField
+                          label="Blocos"
+                          value={values.sets}
+                          onChangeText={(value) => setLog(exercise.id, 'sets', value)}
+                          keyboardType="number-pad"
+                        />
+                      </View>
+                      <View style={styles.logFieldWide}>
+                        <TextField
+                          label="Duração / distância"
+                          value={values.reps}
+                          onChangeText={(value) => setLog(exercise.id, 'reps', value)}
+                        />
+                      </View>
                     </View>
-                    <View style={styles.logField}>
-                      <TextField
-                        label="Reps"
-                        value={values.reps}
-                        onChangeText={(value) => setLog(exercise.id, 'reps', value)}
-                      />
+                  ) : (
+                    <View style={styles.logRow}>
+                      <View style={styles.logField}>
+                        <TextField
+                          label="Séries"
+                          value={values.sets}
+                          onChangeText={(value) => setLog(exercise.id, 'sets', value)}
+                          keyboardType="number-pad"
+                        />
+                      </View>
+                      <View style={styles.logField}>
+                        <TextField
+                          label="Reps"
+                          value={values.reps}
+                          onChangeText={(value) => setLog(exercise.id, 'reps', value)}
+                        />
+                      </View>
+                      <View style={styles.logField}>
+                        <TextField
+                          label="Carga (kg)"
+                          value={values.weight}
+                          onChangeText={(value) => setLog(exercise.id, 'weight', value)}
+                          keyboardType="decimal-pad"
+                          placeholder="0"
+                        />
+                      </View>
                     </View>
-                    <View style={styles.logField}>
-                      <TextField
-                        label="Carga (kg)"
-                        value={values.weight}
-                        onChangeText={(value) => setLog(exercise.id, 'weight', value)}
-                        keyboardType="decimal-pad"
-                        placeholder="0"
-                      />
-                    </View>
-                  </View>
+                  )}
 
                   {instructions ? (
                     <Text style={[styles.instructions, { color: theme.textSecondary }]}>
@@ -612,12 +643,14 @@ export default function WorkoutSessionScreen() {
                         <Text style={[styles.actionText, { color: Brand.primary }]}>Ver vídeo</Text>
                       </Pressable>
                     ) : null}
-                    <Pressable onPress={() => handleStartRest(exercise.rest_seconds)} style={styles.action}>
-                      <Ionicons name="timer-outline" size={18} color={theme.text} />
-                      <Text style={[styles.actionText, { color: theme.text }]}>
-                        Descanso {exercise.rest_seconds ?? 60}s
-                      </Text>
-                    </Pressable>
+                    {(exercise.rest_seconds ?? 0) > 0 ? (
+                      <Pressable onPress={() => handleStartRest(exercise.rest_seconds)} style={styles.action}>
+                        <Ionicons name="timer-outline" size={18} color={theme.text} />
+                        <Text style={[styles.actionText, { color: theme.text }]}>
+                          Descanso {exercise.rest_seconds ?? 60}s
+                        </Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                 </Card>
               );
@@ -815,6 +848,9 @@ const styles = StyleSheet.create({
   },
   logField: {
     flex: 1,
+  },
+  logFieldWide: {
+    flex: 2,
   },
   instructions: {
     fontSize: 12,

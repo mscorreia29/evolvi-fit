@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -29,14 +29,23 @@ export default function AdminPagamentos() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'paid' | 'late'>('pending');
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data: dues } = await supabase
+    const { data: dues, error: duesError } = await supabase
       .from('payment_dues')
       .select('*')
       .order('due_date', { ascending: false })
       .limit(200);
 
+    if (duesError) {
+      setError(duesError.message);
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
+    setError(null);
     const list = (dues as PaymentDue[]) ?? [];
     const studentIds = Array.from(new Set(list.map((d) => d.student_id)));
     const { data: profiles } = await supabase
@@ -60,18 +69,31 @@ export default function AdminPagamentos() {
 
   async function markPaid(row: Row) {
     setActionId(row.id);
-    await supabase
+    const { error: updateError } = await supabase
       .from('payment_dues')
       .update({ status: 'paid', paid_at: new Date().toISOString() })
       .eq('id', row.id);
     setActionId(null);
+    if (updateError) {
+      setError(updateError.message);
+      Alert.alert('Não foi possível atualizar', updateError.message);
+      return;
+    }
     await load();
   }
 
   async function markCancelled(row: Row) {
     setActionId(row.id);
-    await supabase.from('payment_dues').update({ status: 'cancelled' }).eq('id', row.id);
+    const { error: updateError } = await supabase
+      .from('payment_dues')
+      .update({ status: 'cancelled' })
+      .eq('id', row.id);
     setActionId(null);
+    if (updateError) {
+      setError(updateError.message);
+      Alert.alert('Não foi possível atualizar', updateError.message);
+      return;
+    }
     await load();
   }
 
@@ -96,7 +118,18 @@ export default function AdminPagamentos() {
         </View>
       </PhotoHero>
 
-      <View style={styles.filterRow}>
+      {error ? (
+        <Card style={styles.errorCard}>
+          <Ionicons name="alert-circle-outline" size={22} color={Brand.danger} />
+          <View style={styles.errorInfo}>
+            <Text style={[styles.errorTitle, { color: theme.text }]}>Falha nos pagamentos</Text>
+            <Text style={[styles.errorText, { color: theme.textSecondary }]}>{error}</Text>
+          </View>
+          <Button title="Tentar novamente" variant="secondary" onPress={load} />
+        </Card>
+      ) : null}
+
+      {!error ? <View style={styles.filterRow}>
         {(['all', 'pending', 'paid', 'late'] as const).map((f) => (
           <Pressable
             key={f}
@@ -113,9 +146,9 @@ export default function AdminPagamentos() {
             </Text>
           </Pressable>
         ))}
-      </View>
+      </View> : null}
 
-      {filtered.length === 0 ? (
+      {!error ? filtered.length === 0 ? (
         <EmptyState icon="card-outline" title="Nenhum pagamento" message="Nenhum registro com este filtro." />
       ) : (
         filtered.map((row) => (
@@ -158,7 +191,7 @@ export default function AdminPagamentos() {
             {actionId === row.id ? <ActivityIndicator size="small" color={Brand.primary} /> : null}
           </Card>
         ))
-      )}
+      ) : null}
     </Screen>
   );
 }
@@ -189,6 +222,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  errorCard: {
+    gap: Spacing.two,
+    borderColor: Brand.danger,
+  },
+  errorInfo: {
+    gap: 2,
+  },
+  errorTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   filterRow: {
     flexDirection: 'row',

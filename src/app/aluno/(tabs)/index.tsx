@@ -17,6 +17,7 @@ import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { resolveBrandCoverUrl } from '@/lib/branding';
+import { estimateWorkoutMinutes } from '@/lib/exercises';
 import {
   fetchStudentGoals,
   fetchWeeklyCheckin,
@@ -85,7 +86,7 @@ export default function StudentWorkoutScreen() {
     const [workoutsRes, historyRes, goalsRes, checkinRes, waterRes, mealsRes, activityRes] = await Promise.all([
       supabase
         .from('workouts')
-        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
+        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions, muscle_group)))')
         .eq('student_id', profile.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false }),
@@ -179,7 +180,7 @@ export default function StudentWorkoutScreen() {
     { id: 'meal', title: 'Registrar as refeições', desc: 'por refeição', xp: 5, done: meals.length > 0 },
   ];
   const missionsDone = missions.filter((m) => m.done).length;
-  const xpTotal = (profile as any)?.xp ?? 0;
+  const xpTotal = profile?.xp ?? 0;
 
   const weekWorkoutsCount = weekActivity?.sessions.length ?? 0;
   const weekSeconds = weekActivity?.sessions.reduce((sum, session) => sum + (session.duration_seconds ?? 0), 0) ?? 0;
@@ -195,7 +196,24 @@ export default function StudentWorkoutScreen() {
     (sum, day) => sum + (day.workout_exercises?.length ?? 0),
     0,
   );
+  const todayMinutes = estimateWorkoutMinutes(todayWorkout);
   const nextWorkouts = workouts.slice(1, 4);
+
+  function handleMission(id: string) {
+    if (id === 'workout') {
+      if (todayWorkout) {
+        startWorkout(todayWorkout);
+      } else {
+        router.navigate('/aluno/treinos' as never);
+      }
+      return;
+    }
+    if (id === 'water') {
+      handleAddWater(500);
+      return;
+    }
+    router.navigate('/aluno/alimentacao' as never);
+  }
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -293,14 +311,14 @@ export default function StudentWorkoutScreen() {
               <View style={styles.todayTitleBox}>
                 <Text style={[styles.todayName, { color: theme.text }]}>{todayWorkout.name}</Text>
                 <Text style={[styles.todayMeta, { color: theme.textSecondary }]}>
-                  {todayExerciseTotal} exercícios · 60 min
+                  {todayExerciseTotal} exercícios · ~{todayMinutes} min
                 </Text>
               </View>
               {todayWorkoutDone ? <Badge label="FEITO" tone="success" /> : null}
             </View>
             <Button title="Iniciar treino" onPress={() => startWorkout(todayWorkout)} />
             <Button
-              title="Treinar com um amigo"
+              title="Ver todos os treinos"
               variant="secondary"
               onPress={() => router.navigate('/aluno/treinos' as never)}
             />
@@ -365,6 +383,7 @@ export default function StudentWorkoutScreen() {
         nextWorkouts.map((workout, index) => {
           const days = [...(workout.workout_days ?? [])].sort((a, b) => a.order_index - b.order_index);
           const exerciseTotal = days.reduce((sum, day) => sum + (day.workout_exercises?.length ?? 0), 0);
+          const minutes = estimateWorkoutMinutes(workout);
           const label = days[0]?.label ?? String.fromCharCode(66 + index);
           return (
             <Pressable
@@ -382,7 +401,7 @@ export default function StudentWorkoutScreen() {
                   {workout.name}
                 </Text>
                 <Text style={[styles.nextMeta, { color: theme.textSecondary }]}>
-                  {exerciseTotal} exercícios · 60 min
+                  {exerciseTotal} exercícios · ~{minutes} min
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
@@ -448,7 +467,14 @@ export default function StudentWorkoutScreen() {
           </Text>
         ) : null}
         {missions.map((m) => (
-          <Pressable key={m.id} style={styles.missionRow}>
+          <Pressable
+            key={m.id}
+            onPress={() => handleMission(m.id)}
+            disabled={m.done}
+            style={({ pressed }) => [
+              styles.missionRow,
+              { opacity: m.done ? 0.55 : pressed ? 0.75 : 1 },
+            ]}>
             <View style={[styles.missionCheck, { backgroundColor: m.done ? theme.successSoft : theme.backgroundSelected }]}>
               <Ionicons name={m.done ? 'checkmark' : 'ellipse-outline'} size={16} color={m.done ? Brand.success : theme.textSecondary} />
             </View>

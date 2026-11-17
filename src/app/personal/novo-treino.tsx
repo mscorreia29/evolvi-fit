@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExerciseVideoModal } from '@/components/exercise-video-modal';
@@ -15,6 +15,14 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { TextField } from '@/components/ui/text-field';
 import { Brand, Gradients, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  EXERCISE_CATEGORY_FILTERS,
+  EXERCISE_CATEGORY_LABELS,
+  getDefaultPrescription,
+  getExerciseCategory,
+  isCardioCategory,
+  type ExerciseCategory,
+} from '@/lib/exercises';
 import { supabase } from '@/lib/supabase';
 import type { Exercise, Profile, WorkoutWithDays } from '@/lib/types';
 import { useAuth } from '@/providers/auth-provider';
@@ -29,6 +37,7 @@ type ExerciseInput = {
   videoUrl: string | null;
   instructions: string | null;
   notes: string | null;
+  category: ExerciseCategory | null;
 };
 
 type DayInput = {
@@ -48,6 +57,7 @@ function emptyExercise(key: number): ExerciseInput {
     videoUrl: null,
     instructions: null,
     notes: null,
+    category: null,
   };
 }
 
@@ -79,6 +89,7 @@ export default function NewWorkoutScreen() {
   const [libraryVisible, setLibraryVisible] = useState(false);
   const [libraryDayKey, setLibraryDayKey] = useState<number | null>(null);
   const [search, setSearch] = useState('');
+  const [libraryCategory, setLibraryCategory] = useState<ExerciseCategory | 'all'>('all');
   const [video, setVideo] = useState<{
     title: string;
     url: string;
@@ -133,7 +144,7 @@ export default function NewWorkoutScreen() {
     (async () => {
       const { data, error: loadError } = await supabase
         .from('workouts')
-        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
+        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions, muscle_group)))')
         .eq('id', editingId)
         .maybeSingle();
 
@@ -168,6 +179,9 @@ export default function NewWorkoutScreen() {
             videoUrl: exercise.video_url ?? exercise.exercise?.video_url ?? null,
             instructions: exercise.instructions ?? exercise.exercise?.instructions ?? null,
             notes: exercise.notes ?? null,
+            category: exercise.exercise?.muscle_group
+              ? getExerciseCategory({ muscle_group: exercise.exercise.muscle_group })
+              : null,
           })),
       }));
 
@@ -193,14 +207,18 @@ export default function NewWorkoutScreen() {
 
   const filteredLibrary = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return library;
-    return library.filter(
-      (item) =>
+    return library.filter((item) => {
+      if (libraryCategory !== 'all' && getExerciseCategory(item) !== libraryCategory) {
+        return false;
+      }
+      if (!term) return true;
+      return (
         item.name.toLowerCase().includes(term) ||
         (item.muscle_group ?? '').toLowerCase().includes(term) ||
-        (item.equipment ?? '').toLowerCase().includes(term),
-    );
-  }, [library, search]);
+        (item.equipment ?? '').toLowerCase().includes(term)
+      );
+    });
+  }, [library, libraryCategory, search]);
 
   function updateDay(dayKey: number, patch: Partial<DayInput>) {
     setDays((prev) => prev.map((day) => (day.key === dayKey ? { ...day, ...patch } : day)));
@@ -293,16 +311,19 @@ export default function NewWorkoutScreen() {
 
   function addFromLibrary(item: Exercise) {
     const key = nextExerciseKey.current++;
+    const category = getExerciseCategory(item);
+    const prescription = getDefaultPrescription(category);
     const next: ExerciseInput = {
       key,
       name: item.name,
-      sets: '3',
-      reps: '12',
-      rest: '60',
+      sets: prescription.sets,
+      reps: prescription.reps,
+      rest: prescription.rest,
       exerciseId: item.id,
       videoUrl: item.video_url,
       instructions: item.instructions,
       notes: null,
+      category,
     };
 
     setDays((prev) => {
@@ -569,7 +590,11 @@ export default function NewWorkoutScreen() {
             </View>
           </View>
 
-          {day.exercises.map((exercise, index) => (
+          {day.exercises.map((exercise, index) => {
+            const category = exercise.category ?? 'strength';
+            const cardio = isCardioCategory(category);
+
+            return (
             <View
               key={exercise.key}
               style={[styles.exerciseBlock, { borderColor: theme.backgroundSelected }]}>
@@ -586,7 +611,9 @@ export default function NewWorkoutScreen() {
                   {exercise.exerciseId ? (
                     <View style={[styles.badge, { backgroundColor: theme.backgroundSelected }]}>
                       <Text style={[styles.badgeText, { color: theme.textSecondary }]}>
-                        BIBLIOTECA
+                        {exercise.category
+                          ? EXERCISE_CATEGORY_LABELS[exercise.category].toUpperCase()
+                          : 'BIBLIOTECA'}
                       </Text>
                     </View>
                   ) : null}
@@ -655,7 +682,7 @@ export default function NewWorkoutScreen() {
               <View style={styles.row}>
                 <View style={styles.rowItem}>
                   <TextField
-                    label="Séries"
+                    label={cardio ? 'Blocos' : 'Séries'}
                     value={exercise.sets}
                     onChangeText={(value) => updateExercise(day.key, exercise.key, 'sets', value)}
                     keyboardType="number-pad"
@@ -663,10 +690,10 @@ export default function NewWorkoutScreen() {
                 </View>
                 <View style={styles.rowItem}>
                   <TextField
-                    label="Reps"
+                    label={cardio ? 'Duração / distância' : 'Reps'}
                     value={exercise.reps}
                     onChangeText={(value) => updateExercise(day.key, exercise.key, 'reps', value)}
-                    placeholder="12 ou 8-12"
+                    placeholder={cardio ? '20 min ou 5 km' : '12 ou 8-12'}
                   />
                 </View>
                 <View style={styles.rowItem}>
@@ -683,12 +710,17 @@ export default function NewWorkoutScreen() {
                 label="Observação (opcional)"
                 value={exercise.notes ?? ''}
                 onChangeText={(value) => updateExercise(day.key, exercise.key, 'notes', value)}
-                placeholder="Ex: manter o core firme e descer devagar"
+                placeholder={
+                  cardio
+                    ? 'Ex: manter ritmo confortável e registrar distância'
+                    : 'Ex: manter o core firme e descer devagar'
+                }
                 multiline
                 style={styles.notesInput}
               />
             </View>
-          ))}
+          );
+          })}
 
           <View style={styles.dayButtons}>
             <Button
@@ -729,7 +761,9 @@ export default function NewWorkoutScreen() {
           edges={['top', 'bottom', 'left', 'right']}
           style={[styles.modal, { backgroundColor: theme.background }]}>
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Biblioteca de exercícios</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Biblioteca ({filteredLibrary.length})
+            </Text>
             <Pressable onPress={() => setLibraryVisible(false)} accessibilityLabel="Fechar">
               <Ionicons name="close" size={26} color={theme.text} />
             </Pressable>
@@ -744,6 +778,35 @@ export default function NewWorkoutScreen() {
             />
           </View>
 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.libraryFilters}>
+            {EXERCISE_CATEGORY_FILTERS.map((filter) => {
+              const active = libraryCategory === filter.value;
+              return (
+                <Pressable
+                  key={filter.value}
+                  onPress={() => setLibraryCategory(filter.value)}
+                  style={[
+                    styles.libraryFilter,
+                    {
+                      backgroundColor: active ? Brand.primary : theme.backgroundElement,
+                      borderColor: active ? Brand.primary : theme.border,
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.libraryFilterText,
+                      { color: active ? '#FFFFFF' : theme.textSecondary },
+                    ]}>
+                    {filter.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
           <FlatList
             data={filteredLibrary}
             keyExtractor={(item) => item.id}
@@ -751,7 +814,8 @@ export default function NewWorkoutScreen() {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <Text style={[styles.hint, { color: theme.textSecondary }]}>
-                Nenhum exercício encontrado. Rode o arquivo supabase/exercises_seed.sql no Supabase.
+                Nenhum exercício encontrado nesta categoria. Ajuste a busca ou rode
+                supabase/exercises_seed.sql para carregar a biblioteca completa.
               </Text>
             }
             renderItem={({ item }) => (
@@ -1017,6 +1081,21 @@ const styles = StyleSheet.create({
   modalSearch: {
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
+  },
+  libraryFilters: {
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.two,
+    gap: Spacing.two,
+  },
+  libraryFilter: {
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  libraryFilterText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   modalList: {
     padding: Spacing.three,

@@ -85,7 +85,7 @@ export type WorkoutExercise = {
   video_url: string | null;
   instructions: string | null;
   order_index: number;
-  exercise?: Pick<Exercise, 'video_url' | 'instructions'> | null;
+  exercise?: Pick<Exercise, 'video_url' | 'instructions' | 'muscle_group'> | null;
 };
 
 export type WorkoutDay = {

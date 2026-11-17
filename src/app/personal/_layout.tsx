@@ -1,10 +1,11 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 
 import { Loading } from '@/components/ui/loading';
 import { useAuth } from '@/providers/auth-provider';
 
 export default function PersonalLayout() {
-  const { loading, session, profile } = useAuth();
+  const pathname = usePathname();
+  const { loading, session, profile, hasAccess } = useAuth();
 
   if (loading) {
     return <Loading label="Carregando..." />;
@@ -14,8 +15,24 @@ export default function PersonalLayout() {
     return <Redirect href="/login" />;
   }
 
-  if (profile?.role !== 'personal') {
+  if (profile?.role === 'aluno') {
     return <Redirect href="/aluno" />;
+  }
+
+  if (profile?.role === 'admin') {
+    return <Redirect href={'/admin' as never} />;
+  }
+
+  if (profile?.role !== 'personal') {
+    return <Redirect href="/login" />;
+  }
+
+  if (!hasAccess && pathname !== '/personal/bloqueado') {
+    return <Redirect href={'/personal/bloqueado' as never} />;
+  }
+
+  if (hasAccess && pathname === '/personal/bloqueado') {
+    return <Redirect href={'/personal' as never} />;
   }
 
   return (

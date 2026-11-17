@@ -15,6 +15,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { estimateWorkoutMinutes, getExerciseCategory, isCardioCategory } from '@/lib/exercises';
 import { checkNewWorkouts } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import type { WorkoutWithDays } from '@/lib/types';
@@ -42,7 +43,7 @@ export default function StudentTrainingsScreen() {
     try {
       const { data, error: loadError } = await supabase
         .from('workouts')
-        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions)))')
+        .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions, muscle_group)))')
         .eq('student_id', profile.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
@@ -142,13 +143,14 @@ export default function StudentTrainingsScreen() {
         workouts.map((workout) => {
           const days = [...(workout.workout_days ?? [])].sort((a, b) => a.order_index - b.order_index);
           const exerciseTotal = days.reduce((sum, day) => sum + (day.workout_exercises?.length ?? 0), 0);
+          const minutes = estimateWorkoutMinutes(workout);
           return (
             <Card key={workout.id} style={styles.workoutCard}>
               <View style={styles.workoutHeader}>
                 <View style={styles.workoutTitleBox}>
                   <Text style={[styles.workoutName, { color: theme.text }]}>{workout.name}</Text>
                   <Text style={[styles.workoutMeta, { color: theme.textSecondary }]}>
-                    {days.length} divisão(ões) · {exerciseTotal} exercícios
+                    {days.length} divisão(ões) · {exerciseTotal} exercícios · ~{minutes} min
                   </Text>
                 </View>
                 <Badge label="ATIVO" tone="success" />
@@ -169,13 +171,22 @@ export default function StudentTrainingsScreen() {
                     .sort((a, b) => a.order_index - b.order_index)
                     .map((exercise) => {
                       const videoUrl = exercise.video_url ?? exercise.exercise?.video_url ?? null;
-                      const details = [
-                        exercise.sets ? `${exercise.sets} séries` : null,
-                        exercise.reps ? `${exercise.reps} reps` : null,
-                        exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' • ');
+                      const cardio = isCardioCategory(getExerciseCategory(exercise.exercise));
+                      const details = cardio
+                        ? [
+                            exercise.sets ? `${exercise.sets} bloco(s)` : null,
+                            exercise.reps,
+                            exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' • ')
+                        : [
+                            exercise.sets ? `${exercise.sets} séries` : null,
+                            exercise.reps ? `${exercise.reps} reps` : null,
+                            exercise.rest_seconds ? `${exercise.rest_seconds}s desc.` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' • ');
 
                       return (
                         <View key={exercise.id} style={styles.exerciseRow}>
