@@ -3,8 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  PanResponder,
+  Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,9 +13,12 @@ import {
   Text,
   Vibration,
   View,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
 } from 'react-native';
 
-import { ExerciseVideoModal } from '@/components/exercise-video-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -25,6 +28,7 @@ import { Loading } from '@/components/ui/loading';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
+import { Images } from '@/constants/images';
 import { Brand, Gradients, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getExerciseCategory, isCardioCategory } from '@/lib/exercises';
@@ -48,6 +52,21 @@ type FinishResult = {
 function firstNumber(value?: string | null) {
   const match = value?.replace(',', '.').match(/\d+(?:\.\d+)?/);
   return match ? Number(match[0]) : 0;
+}
+
+function lastNumber(value?: string | null) {
+  const matches = value?.replace(',', '.').match(/\d+(?:\.\d+)?/g);
+  return matches?.length ? Number(matches[matches.length - 1]) : 0;
+}
+
+function DashedLine({ color }: { color: string }) {
+  return (
+    <View style={styles.dashRow}>
+      {Array.from({ length: 9 }).map((_, index) => (
+        <View key={index} style={[styles.dash, { backgroundColor: color }]} />
+      ))}
+    </View>
+  );
 }
 
 function beginRest(
@@ -137,14 +156,13 @@ export default function WorkoutSessionScreen() {
   const [finished, setFinished] = useState<FinishResult | null>(null);
   const [bodyWeight, setBodyWeight] = useState<number | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const [video, setVideo] = useState<{
-    title: string;
-    url: string;
-    instructions?: string | null;
-  } | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [modal, setModal] = useState<'weight' | 'evolution' | null>(null);
+  const [weightDraft, setWeightDraft] = useState('');
+  const [carouselWidth, setCarouselWidth] = useState(0);
+  const { width: windowWidth } = useWindowDimensions();
+  const carouselRef = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -223,19 +241,7 @@ export default function WorkoutSessionScreen() {
     [days],
   );
 
-  const exerciseDayLabels = useMemo(() => {
-    const labels: Record<string, string> = {};
-    days.forEach((day) => {
-      day.workout_exercises?.forEach((exercise) => {
-        labels[exercise.id] = day.label;
-      });
-    });
-    return labels;
-  }, [days]);
-
   const activeExercise = exercises[activeIndex] ?? exercises[0] ?? null;
-  const activeVideoUrl = activeExercise ? exerciseVideoUrl(activeExercise) : null;
-  const activeInstructions = activeExercise ? exerciseInstructions(activeExercise) : null;
   const activeDetails = activeExercise ? exerciseDetails(activeExercise) : '';
   const activeCardio = activeExercise
     ? isCardioCategory(getExerciseCategory(activeExercise.exercise))
@@ -244,6 +250,16 @@ export default function WorkoutSessionScreen() {
     ? logs[activeExercise.id] ?? { sets: '', reps: '', weight: '' }
     : { sets: '', reps: '', weight: '' };
   const isActiveDone = activeExercise ? !!done[activeExercise.id] : false;
+
+  const setsValue = activeLog.sets || (activeExercise?.sets != null ? String(activeExercise.sets) : '0');
+  const repsGoal = activeExercise?.reps ?? '';
+  const weightValue = activeLog.weight || '0';
+
+  const cardWidth = Math.max(
+    240,
+    Math.min((carouselWidth || windowWidth - Spacing.three * 2) - 28, 420),
+  );
+  const snapInterval = cardWidth + Spacing.two;
 
   const elapsed = Math.floor((now - startedAt) / 1000);
   const restRemaining = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
@@ -290,50 +306,29 @@ export default function WorkoutSessionScreen() {
     (index: number) => {
       const next = Math.max(0, Math.min(exercises.length - 1, index));
       setActiveIndex(next);
-      setDetailsOpen(false);
+      setMenuOpen(false);
+      carouselRef.current?.scrollTo({ x: next * snapInterval, animated: true });
     },
-    [exercises.length],
+    [exercises.length, snapInterval],
   );
 
-  const slideToExercise = useCallback(
-    (direction: number) => {
-      const next = activeIndex + direction;
-      if (next < 0 || next >= exercises.length) return;
+  function handleCarouselScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const next = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
+    if (next >= 0 && next < exercises.length && next !== activeIndex) {
+      setActiveIndex(next);
+    }
+  }
 
-      Animated.sequence([
-        Animated.timing(slideAnim, {
-          toValue: direction * -44,
-          duration: 110,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 160,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      goToExercise(next);
-    },
-    [activeIndex, exercises.length, goToExercise, slideAnim],
-  );
+  function openWeightEditor() {
+    setWeightDraft(weightValue === '0' ? '' : weightValue);
+    setModal('weight');
+  }
 
-  const swipeResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_event, gesture) =>
-          Math.abs(gesture.dx) > 20 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4,
-        onPanResponderRelease: (_event, gesture) => {
-          if (
-            Math.abs(gesture.dx) < 40 ||
-            Math.abs(gesture.dx) < Math.abs(gesture.dy) * 1.4
-          ) {
-            return;
-          }
-          slideToExercise(gesture.dx > 0 ? -1 : 1);
-        },
-      }),
-    [slideToExercise],
-  );
+  function saveWeight() {
+    if (!activeExercise) return;
+    setLog(activeExercise.id, 'weight', weightDraft.trim());
+    setModal(null);
+  }
 
   function handleExit() {
     if (router.canGoBack()) {
@@ -556,373 +551,287 @@ export default function WorkoutSessionScreen() {
   return (
     <Screen scroll={false} contentStyle={styles.sessionScreen}>
       <View style={styles.sessionHeader}>
-        <View style={styles.topBar}>
+        <Pressable
+          onPress={handleExit}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+          style={styles.headerIconButton}>
+          <Ionicons name="chevron-back" size={24} color={theme.text} />
+        </Pressable>
+
+        <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
+          {workout?.name || 'Treino'}
+        </Text>
+
+        <View style={styles.headerActions}>
           <Pressable
-            onPress={handleExit}
-            style={[styles.exitButton, { backgroundColor: theme.primarySoft }]}
+            onPress={() => setMenuOpen((value) => !value)}
             accessibilityRole="button"
-            accessibilityLabel="Sair do treino">
-            <Ionicons name="arrow-back" size={17} color={Brand.primary} />
-            <Text style={[styles.exitButtonText, { color: Brand.primary }]}>Sair</Text>
+            accessibilityLabel="Mais opções"
+            style={styles.headerIconButton}>
+            <Ionicons name="ellipsis-horizontal" size={22} color={theme.text} />
           </Pressable>
-          <View style={[styles.elapsedPill, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name="stopwatch-outline" size={14} color={Brand.primary} />
-            <Text style={[styles.elapsedPillText, { color: Brand.primary }]}>
-              {formatDuration(elapsed)}
+          <Pressable
+            onPress={finishWorkout}
+            disabled={saving}
+            accessibilityRole="button"
+            accessibilityLabel="Finalizar treino"
+            style={[styles.headerCheck, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name="checkmark" size={18} color={Brand.primary} />
+          </Pressable>
+        </View>
+
+        {menuOpen ? (
+          <View
+            style={[
+              styles.headerMenu,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: theme.border,
+              },
+            ]}>
+            <Text style={[styles.menuInfo, { color: theme.textSecondary }]}>
+              {completedCount}/{exercises.length} concluídos · {formatDuration(elapsed)}
             </Text>
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                handleExit();
+              }}
+              style={styles.menuItem}>
+              <Text style={[styles.menuItemText, { color: theme.text }]}>Sair do treino</Text>
+            </Pressable>
+            {restActive ? (
+              <>
+                <Pressable
+                  onPress={() => {
+                    handleAddRest(15);
+                    setMenuOpen(false);
+                  }}
+                  style={styles.menuItem}>
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Adicionar 15s</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setRestEndsAt(null);
+                    setMenuOpen(false);
+                  }}
+                  style={styles.menuItem}>
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Pular descanso</Text>
+                </Pressable>
+              </>
+            ) : null}
+            {isActiveDone && activeExercise ? (
+              <Pressable
+                onPress={() => {
+                  handleToggleDone(activeExercise);
+                  setMenuOpen(false);
+                }}
+                style={styles.menuItem}>
+                <Text style={[styles.menuItemText, { color: theme.text }]}>
+                  Desfazer conclusão
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
-        </View>
-
-        <View style={styles.workoutTitleRow}>
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
-            {workout.name}
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            {completedCount}/{exercises.length} exercícios marcados
-          </Text>
-        </View>
-
-        <ProgressBar
-          value={exercises.length ? completedCount / exercises.length : 0}
-          height={10}
-        />
+        ) : null}
       </View>
 
       {activeExercise ? (
         <>
           <ScrollView
-            style={styles.sessionBody}
-            contentContainerStyle={styles.sessionBodyContent}
-            keyboardShouldPersistTaps="handled">
-
-          <ScrollView
+            ref={carouselRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.exerciseStrip}>
+            snapToInterval={snapInterval}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            onScroll={handleCarouselScroll}
+            scrollEventThrottle={16}
+            onLayout={(event) => setCarouselWidth(event.nativeEvent.layout.width)}
+            contentContainerStyle={styles.carouselContent}>
             {exercises.map((exercise, index) => {
-              const selected = index === activeIndex;
-              const doneExercise = !!done[exercise.id];
+              const mediaUrl = exerciseVideoUrl(exercise);
+              const log = logs[exercise.id] ?? { sets: '', reps: '', weight: '' };
+              const sets = log.sets || (exercise.sets != null ? String(exercise.sets) : '0');
+              const repsGoal = exercise.reps ?? '';
+              const reps = String(lastNumber(log.reps || repsGoal) || 0);
+              const weight = log.weight || '0';
+              const restSeconds = exercise.rest_seconds ?? 0;
+              const restText =
+                index === activeIndex && restActive
+                  ? formatDuration(restRemaining)
+                  : formatDuration(restSeconds);
+              const note =
+                exercise.notes || exerciseInstructions(exercise) || 'Sem observações para este exercício.';
+
               return (
-                <Pressable
+                <Card
                   key={exercise.id}
-                  onPress={() => goToExercise(index)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Exercício ${index + 1}: ${exercise.name}`}
                   style={[
-                    styles.exerciseChip,
-                    {
-                      backgroundColor: selected ? theme.primarySoft : theme.backgroundElement,
-                      borderColor: selected ? Brand.primary : theme.border,
-                    },
+                    styles.exerciseCardShell,
+                    { width: cardWidth },
+                    done[exercise.id] && styles.exerciseCardDone,
                   ]}>
-                  <Text
-                    style={[
-                      styles.exerciseChipText,
-                      { color: selected ? Brand.primary : theme.textSecondary },
-                    ]}>
-                    {String(index + 1).padStart(2, '0')}
-                  </Text>
-                  {doneExercise ? (
-                    <Ionicons name="checkmark-circle" size={13} color={Brand.success} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <View {...swipeResponder.panHandlers} style={styles.exerciseCarousel}>
-            <Animated.View
-              style={[
-                styles.exerciseCarouselInner,
-                { transform: [{ translateX: slideAnim }] },
-              ]}>
-              <View style={styles.swipeArea}>
-              <View style={styles.focusHeader}>
-                <View
-                  style={[
-                    styles.currentIndex,
-                    {
-                      backgroundColor: isActiveDone
-                        ? theme.successSoft
-                        : theme.primarySoft,
-                    },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.currentIndexText,
-                      { color: isActiveDone ? Brand.success : Brand.primary },
-                    ]}>
-                    {String(activeIndex + 1).padStart(2, '0')}
-                  </Text>
-                </View>
-                <View style={styles.currentTexts}>
-                  <Text
-                    style={[styles.currentExerciseName, { color: theme.text }]}
-                    numberOfLines={1}>
-                    {activeExercise.name}
-                  </Text>
-                  <Text
-                    style={[styles.currentExerciseMeta, { color: theme.textSecondary }]}
-                    numberOfLines={1}>
-                    {`Treino ${exerciseDayLabels[activeExercise.id] ?? 'A'}${
-                      activeDetails ? ` · ${activeDetails}` : ''
-                    }`}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => handleToggleDone(activeExercise)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    isActiveDone ? 'Marcar como pendente' : 'Marcar como concluído'
-                  }
-                  hitSlop={8}>
-                  <Ionicons
-                    name={isActiveDone ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={28}
-                    color={isActiveDone ? Brand.success : theme.textSecondary}
-                  />
-                </Pressable>
-              </View>
-
-              {restActive ? (
-                <Hero
-                  colors={Gradients.accent}
-                  contentStyle={styles.restContent}
-                  style={styles.restHero}>
-                  <View style={styles.restHeader}>
-                    <Ionicons name="timer-outline" size={18} color="#FFFFFF" />
-                    <Text style={styles.restLabel}>DESCANSO</Text>
-                  </View>
-                  <Text style={styles.restValue}>{formatDuration(restRemaining)}</Text>
-                  <View style={styles.restActions}>
-                    <Button
-                      title="+15s"
-                      variant="secondary"
-                      onPress={() => handleAddRest(15)}
-                      style={styles.restButton}
-                    />
-                    <Button
-                      title="Pular"
-                      variant="secondary"
-                      onPress={() => setRestEndsAt(null)}
-                      style={styles.restButton}
-                    />
-                  </View>
-                </Hero>
-              ) : activeVideoUrl ? (
-                <InlineExerciseVideo
-                  key={activeVideoUrl}
-                  url={activeVideoUrl}
-                  title={activeExercise.name}
-                />
-              ) : (
-                <Card style={styles.noVideoCard}>
-                  <Ionicons name="videocam-off-outline" size={20} color={theme.textSecondary} />
-                  <Text style={[styles.noVideoText, { color: theme.textSecondary }]}>
-                    Vídeo indisponível para este exercício.
-                  </Text>
-                </Card>
-              )}
-
-              <Pressable
-                onPress={() => setDetailsOpen((value) => !value)}
-                accessibilityRole="button"
-                accessibilityLabel={detailsOpen ? 'Ocultar detalhes' : 'Ver detalhes'}
-                style={styles.detailsToggle}>
-                <Ionicons
-                  name={detailsOpen ? 'chevron-up-outline' : 'chevron-down-outline'}
-                  size={16}
-                  color={Brand.primary}
-                />
-                <Text style={[styles.detailsToggleText, { color: Brand.primary }]}>
-                  {detailsOpen ? 'Ocultar detalhes' : 'Detalhes do exercício'}
-                </Text>
-              </Pressable>
-
-              {detailsOpen ? (
-                <Card style={[styles.exerciseCard, isActiveDone && styles.exerciseCardDone]}>
-                  {activeCardio ? (
-                    <View style={styles.logRow}>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Blocos"
-                          value={activeLog.sets}
-                          onChangeText={(value) => setLog(activeExercise.id, 'sets', value)}
-                          keyboardType="number-pad"
-                        />
-                      </View>
-                      <View style={styles.logFieldWide}>
-                        <TextField
-                          label="Duração / distância"
-                          value={activeLog.reps}
-                          onChangeText={(value) => setLog(activeExercise.id, 'reps', value)}
-                        />
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.logRow}>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Séries"
-                          value={activeLog.sets}
-                          onChangeText={(value) => setLog(activeExercise.id, 'sets', value)}
-                          keyboardType="number-pad"
-                        />
-                      </View>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Reps"
-                          value={activeLog.reps}
-                          onChangeText={(value) => setLog(activeExercise.id, 'reps', value)}
-                        />
-                      </View>
-                      <View style={styles.logField}>
-                        <TextField
-                          label="Carga (kg)"
-                          value={activeLog.weight}
-                          onChangeText={(value) => setLog(activeExercise.id, 'weight', value)}
-                          keyboardType="decimal-pad"
-                          placeholder="0"
-                        />
-                      </View>
-                    </View>
-                  )}
-
-                  {activeInstructions ? (
-                    <Text style={[styles.instructions, { color: theme.textSecondary }]}>
-                      {activeInstructions}
+                  <View
+                    style={[styles.cardTitleBand, { backgroundColor: theme.backgroundSelected }]}>
+                    <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={1}>
+                      {exercise.name}
                     </Text>
-                  ) : null}
+                  </View>
 
-                  {activeExercise.notes ? (
+                  <View style={styles.mediaArea}>
+                    {index === activeIndex && mediaUrl ? (
+                      <InlineExerciseVideo
+                        key={mediaUrl}
+                        url={mediaUrl}
+                        title={exercise.name}
+                      />
+                    ) : (
+                      <Image source={Images.workout} style={styles.mediaImage} resizeMode="cover" />
+                    )}
+                    <View pointerEvents="none" style={styles.mediaShade} />
+                  </View>
+
+                  <Pressable
+                    onPress={() => {
+                      goToExercise(index);
+                      handleStartRest(exercise.rest_seconds);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Iniciar descanso de ${exercise.name}`}
+                    style={[styles.timerFab, { borderColor: theme.backgroundElement }]}>
+                    <Ionicons name="timer-outline" size={22} color="#FFFFFF" />
+                  </Pressable>
+
+
+                  <View style={styles.cardBody}>
+                    <View style={styles.metricsRow}>
+                      <View style={styles.metricColumn}>
+                        <Text style={[styles.metricValue, { color: theme.text }]}>{sets}</Text>
+                        <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
+                          Séries
+                        </Text>
+                      </View>
+
+                      <View style={styles.metricColumn}>
+                        <Text style={[styles.metricValue, { color: theme.text }]}>{reps}</Text>
+                        <DashedLine color={theme.border} />
+                        <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
+                          Repetições
+                        </Text>
+                        <Text
+                          style={[
+                            styles.metricGoal,
+                            { color: Brand.primary, backgroundColor: theme.primarySoft },
+                          ]}>
+                          {repsGoal || '—'}
+                        </Text>
+                      </View>
+
+                      <Pressable
+                        onPress={() => {
+                          goToExercise(index);
+                          openWeightEditor();
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Editar carga"
+                        style={styles.metricColumn}>
+                        <View style={styles.weightValueRow}>
+                          <Text style={[styles.metricValue, { color: theme.text }]}>{weight}</Text>
+                          <Text style={[styles.weightUnit, { color: theme.textSecondary }]}>kg</Text>
+                          <View style={[styles.editBadge, { backgroundColor: theme.primarySoft }]}>
+                            <Ionicons name="pencil" size={10} color={Brand.primary} />
+                          </View>
+                        </View>
+                        <DashedLine color={theme.border} />
+                        <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Carga</Text>
+                        <Text style={[styles.metricHint, { color: theme.textSecondary }]}>
+                          toque e digite
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    <View style={styles.restBlock}>
+                      <Text style={[styles.restTime, { color: theme.text }]}>{restText}</Text>
+                      <Text style={[styles.restCaption, { color: theme.textSecondary }]}>
+                        Descanso
+                      </Text>
+                    </View>
+
                     <View
                       style={[
-                        styles.noteBox,
+                        styles.observationBox,
                         {
                           backgroundColor: theme.backgroundSelected,
                           borderColor: theme.border,
                         },
                       ]}>
-                      <Ionicons
-                        name="information-circle-outline"
-                        size={16}
-                        color={Brand.warning}
-                      />
-                      <Text style={[styles.noteText, { color: theme.textSecondary }]}>
-                        {activeExercise.notes}
+                      <View style={styles.observationHeader}>
+                        <Ionicons name="chatbubble-outline" size={14} color={Brand.primary} />
+                        <Text style={[styles.observationTitle, { color: Brand.primary }]}>
+                          OBSERVAÇÃO DO PERSONAL
+                        </Text>
+                      </View>
+                      <Text
+                        style={[styles.observationText, { color: theme.textSecondary }]}
+                        numberOfLines={3}>
+                        {note}
                       </Text>
                     </View>
-                  ) : null}
+                  </View>
 
-                  <View style={styles.exerciseActions}>
-                    {activeVideoUrl ? (
-                      <Pressable
-                        onPress={() =>
-                          setVideo({
-                            title: activeExercise.name,
-                            url: activeVideoUrl,
-                            instructions: activeInstructions,
-                          })
-                        }
-                        style={styles.action}>
-                        <Ionicons name="expand-outline" size={18} color={Brand.primary} />
-                        <Text style={[styles.actionText, { color: Brand.primary }]}>
-                          Ampliar vídeo
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                    {(activeExercise.rest_seconds ?? 0) > 0 ? (
-                      <Pressable
-                        onPress={() => handleStartRest(activeExercise.rest_seconds)}
-                        style={styles.action}>
-                        <Ionicons name="timer-outline" size={18} color={theme.text} />
-                        <Text style={[styles.actionText, { color: theme.text }]}>
-                          Descanso {activeExercise.rest_seconds ?? 60}s
-                        </Text>
-                      </Pressable>
-                    ) : null}
+                  <View style={styles.cardActions}>
+                    <Pressable
+                      onPress={() => {
+                        goToExercise(index);
+                        setModal('evolution');
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Ver evolução"
+                      style={[
+                        styles.evolutionButton,
+                        {
+                          backgroundColor: theme.backgroundSelected,
+                          borderColor: theme.border,
+                        },
+                      ]}>
+                      <Ionicons name="trending-up-outline" size={20} color={Brand.primary} />
+                    </Pressable>
+                    <Button
+                      title={done[exercise.id] ? 'Concluído' : 'Finalizar'}
+                      variant={done[exercise.id] ? 'secondary' : 'primary'}
+                      disabled={done[exercise.id]}
+                      onPress={() => {
+                        goToExercise(index);
+                        handleToggleDone(exercise);
+                      }}
+                      style={styles.cardFinishButton}
+                    />
                   </View>
                 </Card>
-              ) : null}
-            </View>
-            </Animated.View>
-          </View>
+              );
+            })}
+          </ScrollView>
 
-        </ScrollView>
+        {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
 
-        <View style={[styles.sessionFooter, { borderTopColor: theme.border }]}>
-          {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
-          <View style={styles.footerPrimaryRow}>
+        <View style={styles.pagination}>
+          {exercises.map((exercise, index) => (
             <Pressable
-              onPress={() => slideToExercise(-1)}
-              disabled={activeIndex === 0}
+              key={exercise.id}
+              onPress={() => goToExercise(index)}
               accessibilityRole="button"
-              accessibilityLabel="Exercício anterior"
+              accessibilityLabel={`Ir para o exercício ${index + 1}`}
               style={[
-                styles.footerIconButton,
+                styles.paginationDot,
                 {
-                  backgroundColor: theme.backgroundSelected,
-                  borderColor: theme.border,
-                  opacity: activeIndex === 0 ? 0.4 : 1,
+                  backgroundColor: index === activeIndex ? Brand.primary : theme.border,
+                  width: index === activeIndex ? 24 : 8,
                 },
-              ]}>
-              <Ionicons name="chevron-back" size={20} color={theme.text} />
-            </Pressable>
-            <Button
-              title={isActiveDone ? 'Exercício finalizado' : 'Finalizar exercício'}
-              variant={isActiveDone ? 'secondary' : 'primary'}
-              disabled={isActiveDone}
-              onPress={() => handleToggleDone(activeExercise)}
-              style={styles.footerMainButton}
+              ]}
             />
-            <Pressable
-              onPress={() => slideToExercise(1)}
-              disabled={activeIndex === exercises.length - 1}
-              accessibilityRole="button"
-              accessibilityLabel="Próximo exercício"
-              style={[
-                styles.footerIconButton,
-                {
-                  backgroundColor: theme.backgroundSelected,
-                  borderColor: theme.border,
-                  opacity: activeIndex === exercises.length - 1 ? 0.4 : 1,
-                },
-              ]}>
-              <Ionicons name="chevron-forward" size={20} color={theme.text} />
-            </Pressable>
-          </View>
-          <View style={styles.footerSecondaryRow}>
-            <View style={styles.footerMeta}>
-              <Text style={[styles.footerCount, { color: theme.textSecondary }]}>
-                {activeIndex + 1} / {exercises.length}
-              </Text>
-              {isActiveDone ? (
-                <Pressable
-                  onPress={() => handleToggleDone(activeExercise)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Desfazer conclusão do exercício"
-                  style={styles.footerUndo}>
-                  <Ionicons name="arrow-undo-outline" size={14} color={theme.textSecondary} />
-                  <Text style={[styles.footerUndoText, { color: theme.textSecondary }]}>
-                    Desfazer
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-            <Pressable
-              onPress={finishWorkout}
-              disabled={saving}
-              accessibilityRole="button"
-              accessibilityLabel="Finalizar treino">
-              <Text
-                style={[
-                  styles.finishSessionText,
-                  { color: saving ? theme.textSecondary : Brand.primary },
-                ]}>
-                {saving ? 'Salvando...' : 'Finalizar treino'}
-              </Text>
-            </Pressable>
-          </View>
+          ))}
         </View>
         </>
       ) : (
@@ -933,27 +842,95 @@ export default function WorkoutSessionScreen() {
             actionLabel="Voltar"
             onAction={handleExit}
           />
-          <View style={[styles.sessionFooter, { borderTopColor: theme.border }]}>
-            {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
-            <Button title="Finalizar treino" onPress={finishWorkout} loading={saving} />
-          </View>
+          {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
         </>
       )}
 
-      <ExerciseVideoModal
-        visible={video !== null}
-        onClose={() => setVideo(null)}
-        title={video?.title ?? ''}
-        videoUrl={video?.url}
-        instructions={video?.instructions}
-      />
+      <Modal
+        visible={modal === 'weight'}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModal(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setModal(null)}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+            onPress={() => undefined}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Carga do exercício</Text>
+            <TextField
+              label="Carga (kg)"
+              value={weightDraft}
+              onChangeText={setWeightDraft}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <Button
+                title="Cancelar"
+                variant="secondary"
+                onPress={() => setModal(null)}
+                style={styles.modalButton}
+              />
+              <Button title="Salvar" onPress={saveWeight} style={styles.modalButton} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={modal === 'evolution'}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModal(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setModal(null)}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+            onPress={() => undefined}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Evolução</Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              {activeExercise?.name ?? 'Exercício'} · {activeCardio ? 'Cardio' : 'Força'}
+            </Text>
+            <View style={styles.evolutionStats}>
+              <View style={styles.evolutionStat}>
+                <Text style={[styles.evolutionValue, { color: theme.text }]}>{setsValue}</Text>
+                <Text style={[styles.evolutionLabel, { color: theme.textSecondary }]}>Séries</Text>
+              </View>
+              <View style={styles.evolutionStat}>
+                <Text style={[styles.evolutionValue, { color: theme.text }]}>
+                  {activeLog.reps || repsGoal || '—'}
+                </Text>
+                <Text style={[styles.evolutionLabel, { color: theme.textSecondary }]}>Reps</Text>
+              </View>
+              <View style={styles.evolutionStat}>
+                <Text style={[styles.evolutionValue, { color: theme.text }]}>{weightValue}</Text>
+                <Text style={[styles.evolutionLabel, { color: theme.textSecondary }]}>Kg</Text>
+              </View>
+            </View>
+            <Text style={[styles.evolutionHint, { color: theme.textSecondary }]}>
+              {activeDetails || 'Nenhum histórico registrado nesta sessão.'}
+            </Text>
+            <Button title="Fechar" variant="secondary" onPress={() => setModal(null)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   sessionHeader: {
-    gap: Spacing.two,
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 56,
+    marginBottom: Spacing.two,
   },
   topBar: {
     flexDirection: 'row',
@@ -1077,6 +1054,7 @@ const styles = StyleSheet.create({
   },
   sessionScreen: {
     paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
   },
   sessionBody: {
     flex: 1,
@@ -1144,15 +1122,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   inlineVideoWrap: {
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    width: '100%',
+    height: '100%',
     backgroundColor: '#000000',
     overflow: 'hidden',
   },
   inlineVideo: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    height: '100%',
   },
   noVideoCard: {
     flexDirection: 'row',
@@ -1371,5 +1348,289 @@ const styles = StyleSheet.create({
   finishSummaryText: {
     fontSize: 13,
     lineHeight: 19,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerCheck: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerMenu: {
+    position: 'absolute',
+    top: 50,
+    right: 0,
+    width: 208,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.one,
+    gap: 2,
+    zIndex: 10,
+  },
+  menuInfo: {
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
+  },
+  menuItem: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 10,
+    borderRadius: Radius.sm,
+  },
+  menuItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  carouselContent: {
+    gap: Spacing.two,
+  },
+  exerciseCardShell: {
+    alignSelf: 'flex-start',
+    borderRadius: 24,
+    padding: 0,
+    gap: 0,
+    overflow: 'hidden',
+  },
+  cardTitleBand: {
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  mediaArea: {
+    position: 'relative',
+    height: 156,
+    backgroundColor: '#000000',
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaShade: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+  },
+  timerFab: {
+    position: 'absolute',
+    top: 177,
+    left: '50%',
+    width: 50,
+    height: 50,
+    marginLeft: -25,
+    borderRadius: Radius.full,
+    borderWidth: 5,
+    backgroundColor: Brand.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  cardBody: {
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingTop: 34,
+    paddingBottom: Spacing.two,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.one,
+  },
+  metricColumn: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 0,
+  },
+  metricValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    fontVariant: ['tabular-nums'],
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  metricGoal: {
+    fontSize: 11,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
+  metricHint: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  weightValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  weightUnit: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  editBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -16,
+    width: 18,
+    height: 18,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dashRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    height: 1,
+    marginVertical: 2,
+  },
+  dash: {
+    width: 6,
+    height: 1,
+    borderRadius: 1,
+  },
+  restBlock: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  restTime: {
+    fontSize: 22,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  restCaption: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  observationBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: Spacing.three,
+    gap: 6,
+  },
+  observationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  observationTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  observationText: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.three,
+  },
+  evolutionButton: {
+    width: 50,
+    height: 50,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardFinishButton: {
+    flex: 1,
+    borderRadius: 16,
+  },
+  pagination: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: Spacing.two,
+  },
+  paginationDot: {
+    height: 8,
+    borderRadius: Radius.full,
+  },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.three,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    padding: Spacing.three,
+    gap: Spacing.three,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: Radius.md,
+  },
+  evolutionStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  evolutionStat: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  evolutionValue: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  evolutionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  evolutionHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
   },
 });
