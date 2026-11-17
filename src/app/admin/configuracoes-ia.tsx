@@ -193,6 +193,9 @@ export default function AdminIaScreen() {
           secureTextEntry
           autoCapitalize="none"
         />
+        <Text style={[styles.toggleHint, { color: theme.textSecondary }]}>
+          Deixe vazio para usar as secrets já configuradas: GEMINI_API_KEY ou OPENAI_API_KEY.
+        </Text>
         {settings?.api_key ? (
           <Pressable onPress={() => setClearApiKey((value) => !value)} style={styles.checkRow}>
             <Ionicons

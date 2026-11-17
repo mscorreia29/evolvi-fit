@@ -119,9 +119,13 @@ function parsePlan(payload: any): WorkoutPlan {
 }
 
 async function callProvider(settings: Settings, prompt: string) {
-  const key = settings.api_key?.trim() || Deno.env.get('AI_API_KEY')?.trim();
+  const providerSecret = settings.provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY';
+  const key =
+    settings.api_key?.trim() ||
+    Deno.env.get('AI_API_KEY')?.trim() ||
+    Deno.env.get(providerSecret)?.trim();
   if (!key) {
-    throw new Error('Chave de IA não configurada no painel Admin Master.');
+    throw new Error('Chave de IA não configurada no painel Admin Master ou nas secrets do Supabase.');
   }
 
   if (settings.provider === 'openai') {
