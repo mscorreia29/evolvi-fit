@@ -74,6 +74,16 @@ function Answer({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+function AnamnesisSectionTitle({ children }: { children: string }) {
+  const theme = useTheme();
+
+  return (
+    <Text style={[styles.anamnesisSection, { color: theme.textSecondary }]}>
+      {children}
+    </Text>
+  );
+}
+
 function InfoRow({
   icon,
   label,
@@ -615,6 +625,69 @@ export default function StudentDetailScreen() {
         <InfoRow icon="time-outline" label="Aluno desde" value={formatDate(student.created_at)} />
       </Card>
 
+      {anamnesis ? (
+        <Card>
+          <SectionHeader
+            title="Anamnese do aluno"
+            subtitle={`Respostas do convite em ${formatDate(anamnesis.created_at)}`}
+          />
+          <View style={styles.anamnesisSummary}>
+            {anamnesis.data.goal ? <Badge label={anamnesis.data.goal} tone="primary" /> : null}
+            {anamnesis.data.experience ? <Badge label={anamnesis.data.experience} tone="muted" /> : null}
+            {anamnesis.data.frequency ? <Badge label={anamnesis.data.frequency} tone="success" /> : null}
+          </View>
+          <AnamnesisSectionTitle>Treino</AnamnesisSectionTitle>
+          <Answer label="Objetivo" value={anamnesis.data.goal} />
+          <Answer label="Experiência" value={anamnesis.data.experience} />
+          <Answer label="Frequência semanal" value={anamnesis.data.frequency} />
+          <Answer label="Duração da sessão" value={anamnesis.data.sessionLength} />
+          <Answer label="Local de treino" value={anamnesis.data.location} />
+          <Answer label="Disponibilidade" value={anamnesis.data.availability} />
+          <Answer
+            label="Equipamentos"
+            value={anamnesis.data.equipment?.length ? anamnesis.data.equipment.join(', ') : null}
+          />
+          <AnamnesisSectionTitle>Saúde</AnamnesisSectionTitle>
+          <Answer
+            label="Condições de saúde"
+            value={
+              anamnesis.data.healthConditions?.length
+                ? anamnesis.data.healthConditions.join(', ')
+                : null
+            }
+          />
+          <Answer label="Usa medicação" value={anamnesis.data.medicationUse} />
+          <Answer label="Medicamentos" value={anamnesis.data.medications} />
+          <Answer label="Histórico de fratura" value={anamnesis.data.fractureHistory} />
+          <Answer label="Lesões" value={anamnesis.data.injuries} />
+          <Answer label="Dores" value={anamnesis.data.pain} />
+          <Answer label="Liberação médica" value={anamnesis.data.medicalClearance} />
+          <Answer label="Saúde / restrições" value={anamnesis.data.health} />
+          <AnamnesisSectionTitle>Estilo de vida</AnamnesisSectionTitle>
+          <Answer label="Qualidade da dieta" value={anamnesis.data.dietQuality} />
+          <Answer label="Refeições por dia" value={anamnesis.data.mealsPerDay} />
+          <Answer label="Acompanhamento alimentar" value={anamnesis.data.dietFollow} />
+          <Answer label="Consumo de água" value={anamnesis.data.waterIntake} />
+          <Answer label="Álcool" value={anamnesis.data.alcohol} />
+          <Answer label="Tabagismo" value={anamnesis.data.smoking} />
+          <Answer label="Sono" value={anamnesis.data.sleep} />
+          <Answer label="Estresse" value={anamnesis.data.stress} />
+          <Answer label="Suplementos" value={anamnesis.data.supplements} />
+          <Answer label="Observações" value={anamnesis.data.notes} />
+        </Card>
+      ) : (
+        <Card>
+          <SectionHeader
+            title="Anamnese do aluno"
+            subtitle="Aguardando respostas do convite"
+          />
+          <Text style={[styles.meta, { color: theme.textSecondary }]}>
+            O aluno ainda não preencheu a anamnese. Os dados aparecerão aqui quando ele aceitar
+            o convite.
+          </Text>
+        </Card>
+      )}
+
       <Card>
         <SectionHeader
           title="Avaliações físicas"
@@ -834,19 +907,6 @@ export default function StudentDetailScreen() {
           ))
         )}
       </Card>
-
-      {anamnesis ? (
-        <Card>
-          <SectionHeader title="Anamnese" subtitle={`Respondida em ${formatDate(anamnesis.created_at)}`} />
-          <Answer label="Objetivo" value={anamnesis.data.goal} />
-          <Answer label="Experiência" value={anamnesis.data.experience} />
-          <Answer label="Frequência" value={anamnesis.data.frequency} />
-          <Answer label="Local de treino" value={anamnesis.data.location} />
-          <Answer label="Condições de saúde" value={anamnesis.data.healthConditions?.length ? anamnesis.data.healthConditions.join(', ') : null} />
-          <Answer label="Lesões / histórico" value={anamnesis.data.injuries} />
-          <Answer label="Observações" value={anamnesis.data.notes} />
-        </Card>
-      ) : null}
 
       <Card>
         <SectionHeader title="Acesso do aluno" subtitle={student.email ?? 'Aluno sem email cadastrado'} />
@@ -1177,6 +1237,19 @@ const styles = StyleSheet.create({
   historyValues: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  anamnesisSummary: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+    paddingTop: Spacing.two,
+  },
+  anamnesisSection: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    paddingTop: Spacing.three,
   },
   answerRow: {
     gap: 2,

@@ -6,6 +6,7 @@ import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExerciseVideoModal } from '@/components/exercise-video-modal';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Hero } from '@/components/ui/hero';
@@ -23,6 +24,7 @@ import {
   isCardioCategory,
   type ExerciseCategory,
 } from '@/lib/exercises';
+import type { AnamnesisAnswers } from '@/lib/invites';
 import { supabase } from '@/lib/supabase';
 import type { Exercise, Profile, WorkoutWithDays } from '@/lib/types';
 import { useAuth } from '@/providers/auth-provider';
@@ -65,6 +67,19 @@ function dayLetter(index: number) {
   return String.fromCharCode(65 + (index % 26));
 }
 
+function PreferenceRow({ label, value }: { label: string; value?: string | null }) {
+  const theme = useTheme();
+
+  if (!value) return null;
+
+  return (
+    <View style={styles.preferenceRow}>
+      <Text style={[styles.preferenceLabel, { color: theme.textSecondary }]}>{label}</Text>
+      <Text style={[styles.preferenceValue, { color: theme.text }]}>{value}</Text>
+    </View>
+  );
+}
+
 export default function NewWorkoutScreen() {
   const router = useRouter();
   const { edit, student } = useLocalSearchParams<{ edit?: string; student?: string }>();
@@ -84,6 +99,10 @@ export default function NewWorkoutScreen() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(editingId));
+  const [anamnesis, setAnamnesis] = useState<{
+    studentId: string;
+    data: AnamnesisAnswers | null;
+  } | null>(null);
 
   const [library, setLibrary] = useState<Exercise[]>([]);
   const [libraryVisible, setLibraryVisible] = useState(false);
@@ -135,6 +154,33 @@ export default function NewWorkoutScreen() {
       loadLibrary();
     }, [loadStudents, loadLibrary]),
   );
+
+  useEffect(() => {
+    if (!studentId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const { data } = await supabase
+        .from('anamnesis')
+        .select('data')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!cancelled) {
+        setAnamnesis({
+          studentId,
+          data: (data?.data as AnamnesisAnswers) ?? null,
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId]);
 
   useEffect(() => {
     if (!editingId) return;
@@ -463,6 +509,10 @@ export default function NewWorkoutScreen() {
     0,
   );
 
+  const selectedStudent = students.find((item) => item.id === studentId) ?? null;
+  const studentAnamnesis =
+    anamnesis && anamnesis.studentId === studentId ? anamnesis.data : null;
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -539,6 +589,65 @@ export default function NewWorkoutScreen() {
           </View>
         )}
       </Card>
+
+      {studentId ? (
+        <Card>
+          <SectionHeader
+            title="Anamnese do aluno"
+            subtitle={selectedStudent?.full_name ?? 'Preferências do convite'}
+            actionLabel="Ver ficha"
+            onAction={() =>
+              router.push({
+                pathname: '/personal/aluno/[id]' as any,
+                params: { id: studentId },
+              })
+            }
+          />
+          {studentAnamnesis ? (
+            <>
+              <View style={styles.preferenceBadges}>
+                {studentAnamnesis.goal ? (
+                  <Badge label={studentAnamnesis.goal} tone="primary" />
+                ) : null}
+                {studentAnamnesis.experience ? (
+                  <Badge label={studentAnamnesis.experience} tone="muted" />
+                ) : null}
+                {studentAnamnesis.frequency ? (
+                  <Badge label={studentAnamnesis.frequency} tone="success" />
+                ) : null}
+              </View>
+              <PreferenceRow label="Duração da sessão" value={studentAnamnesis.sessionLength} />
+              <PreferenceRow label="Local de treino" value={studentAnamnesis.location} />
+              <PreferenceRow label="Disponibilidade" value={studentAnamnesis.availability} />
+              <PreferenceRow
+                label="Equipamentos"
+                value={
+                  studentAnamnesis.equipment?.length
+                    ? studentAnamnesis.equipment.join(', ')
+                    : null
+                }
+              />
+              <PreferenceRow
+                label="Condições de saúde"
+                value={
+                  studentAnamnesis.healthConditions?.length
+                    ? studentAnamnesis.healthConditions.join(', ')
+                    : null
+                }
+              />
+              <PreferenceRow label="Medicação" value={studentAnamnesis.medications} />
+              <PreferenceRow label="Lesões" value={studentAnamnesis.injuries} />
+              <PreferenceRow label="Dores" value={studentAnamnesis.pain} />
+              <PreferenceRow label="Restrições" value={studentAnamnesis.health} />
+              <PreferenceRow label="Observações" value={studentAnamnesis.notes} />
+            </>
+          ) : (
+            <Text style={[styles.hint, { color: theme.textSecondary }]}>
+              Este aluno ainda não preencheu a anamnese do convite.
+            </Text>
+          )}
+        </Card>
+      ) : null}
 
       <SectionHeader title="Divisões" subtitle={`${days.length} dia(s) • ${totalExercises} exercícios`} />
 
@@ -943,6 +1052,26 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  preferenceBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+    paddingTop: Spacing.two,
+  },
+  preferenceRow: {
+    gap: 2,
+    paddingTop: Spacing.two,
+  },
+  preferenceLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  preferenceValue: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
