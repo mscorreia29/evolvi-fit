@@ -286,6 +286,39 @@ export default function PersonalProfileScreen() {
         <Button title="Alterar senha" variant="secondary" onPress={handleChangePassword} loading={savingPassword} />
       </Card>
 
+      <Card>
+        <SectionTitle icon="phone-portrait-outline" title="Instalar o app" />
+        <Text style={[styles.hint, { color: theme.textSecondary }]}>
+          Escolha seu celular e siga os passos para deixar o Evolvi Fit na tela inicial.
+        </Text>
+
+        <View style={styles.installBlock}>
+          <Text style={[styles.installPlatform, { color: theme.text }]}>iPhone / iPad (Safari)</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>1. Abra evolvi-fit.vercel.app no Safari.</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>2. Toque no botão Compartilhar (quadrado com seta para cima).</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>3. Role a lista e toque em &quot;Adicionar à Tela de Início&quot;.</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>4. Toque em &quot;Adicionar&quot;.</Text>
+          <Text style={[styles.installNote, { color: theme.textSecondary }]}>
+            Notificações: abra o app instalado e permita quando o navegador pedir. Se não aparecer, acompanhe os avisos pelo sino dentro do app.
+          </Text>
+        </View>
+
+        <View style={[styles.installBlock, { borderTopWidth: 1, borderTopColor: theme.border }]}>
+          <Text style={[styles.installPlatform, { color: theme.text }]}>Android (Chrome)</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>1. Abra evolvi-fit.vercel.app no Chrome.</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>2. Toque no menu (⋮) e escolha &quot;Instalar app&quot; ou &quot;Adicionar à tela inicial&quot;.</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>3. Confirme a instalação.</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>4. Abra o app instalado e toque em &quot;Permitir&quot; quando pedir notificações.</Text>
+          <Text style={[styles.installStep, { color: theme.text }]}>5. Se não aparecer o pedido: menu (⋮) do app → Informações do app (ⓘ) → Notificações → Ativar.</Text>
+          <Text style={[styles.installNote, { color: theme.textSecondary }]}>
+            Outro caminho: Chrome → menu (⋮) → Configurações → Configurações do site → Notificações → permitir evolvi-fit.vercel.app.
+          </Text>
+          <Text style={[styles.installNote, { color: theme.textSecondary }]}>
+            Com notificações ativas você recebe avisos de treinos, mensagens, feedbacks e lembretes do app.
+          </Text>
+        </View>
+      </Card>
+
       <Badge label="Conta segura e sincronizada" tone="muted" style={styles.footerBadge} />
       <Button title="Sair da conta" onPress={handleSignOut} variant="danger" />
     </Screen>
@@ -329,6 +362,24 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 13,
     lineHeight: 19,
+  },
+  installBlock: {
+    gap: 4,
+    paddingTop: Spacing.two,
+  },
+  installPlatform: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  installStep: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  installNote: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
   },
   sectionTitleRow: {
     flexDirection: 'row',
