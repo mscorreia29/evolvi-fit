@@ -144,7 +144,7 @@ export default function PersonalDashboard() {
 
   const studentMap = new Map(students.map((s) => [s.id, s]));
   const workoutMap = new Map(workouts.map((w) => [w.id, w.name]));
-  const recent = sessions.slice(0, 6);
+  const recent = sessions.slice(0, 3);
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
@@ -400,7 +400,7 @@ export default function PersonalDashboard() {
       </View>
 
       <SectionHeader
-        title="últimos treinos"
+        title="Últimos treinos"
         actionLabel="Ver alunos"
         onAction={() => router.push('/personal/alunos')}
       />
@@ -416,16 +416,19 @@ export default function PersonalDashboard() {
           </Text>
         </Card>
       ) : (
-        recent.map((session) => {
-          const student = studentMap.get(session.student_id);
-          return (
-            <Pressable
-              key={session.id}
-              onPress={() =>
-              router.push(`/personal/aluno/${session.student_id}`)
-              }>
-              <Card style={styles.recentCard}>
-                <Avatar name={student?.full_name} size={42} />
+        <Card style={styles.recentListCard}>
+          {recent.map((session, index) => {
+            const student = studentMap.get(session.student_id);
+            return (
+              <Pressable
+                key={session.id}
+                onPress={() => router.push(`/personal/aluno/${session.student_id}`)}
+                style={({ pressed }) => [
+                  styles.recentRow,
+                  index > 0 && { borderTopWidth: 1, borderTopColor: theme.border },
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}>
+                <Avatar name={student?.full_name} size={38} />
                 <View style={styles.recentInfo}>
                   <Text style={[styles.recentName, { color: theme.text }]}>
                     {student?.full_name ?? 'Aluno'}
@@ -437,10 +440,10 @@ export default function PersonalDashboard() {
                 <View style={[styles.doneIcon, { backgroundColor: theme.successSoft }]}>
                   <Ionicons name="checkmark" size={16} color={Brand.success} />
                 </View>
-              </Card>
-            </Pressable>
-          );
-        })
+              </Pressable>
+            );
+          })}
+        </Card>
       )}
     </Screen>
   );
@@ -657,10 +660,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.three,
   },
-  recentCard: {
+  recentListCard: {
+    paddingVertical: Spacing.one,
+    gap: 0,
+  },
+  recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+    paddingVertical: Spacing.two,
   },
   recentInfo: {
     flex: 1,
