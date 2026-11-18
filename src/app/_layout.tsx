@@ -9,6 +9,15 @@ import '@/lib/notifications';
 import { loadActiveWorkoutSession } from '@/lib/workouts';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
 
+const PAYWALL_ALLOWED_PATHS = [
+  '/aluno/bloqueado',
+  '/login',
+  '/signup',
+  '/signup-autonomo',
+  '/forgot-password',
+  '/reset-password',
+];
+
 const darkNavigation = {
   ...DarkTheme,
   colors: {
@@ -51,15 +60,17 @@ function useNotificationObserver() {
 }
 
 function WorkoutResumeGuard() {
-  const { loading, profile } = useAuth();
+  const { loading, profile, hasAccess } = useAuth();
   const pathname = usePathname();
   const resumeRouter = useRouter();
+  const isAutonomous = profile?.role === 'aluno' && Boolean(profile?.is_autonomous);
 
   useEffect(() => {
     let cancelled = false;
 
     async function resume() {
-      if (loading || !profile) return;
+      if (loading || !profile || (isAutonomous && !hasAccess)) return;
+      if (pathname === '/aluno/bloqueado') return;
       const draft = await loadActiveWorkoutSession();
       if (cancelled || !draft || draft.studentId !== profile.id) return;
       if (pathname.startsWith(`/aluno/treino/${draft.workoutId}`)) return;
@@ -76,7 +87,23 @@ function WorkoutResumeGuard() {
       cancelled = true;
       subscription.remove();
     };
-  }, [loading, profile, pathname, resumeRouter]);
+  }, [loading, profile, hasAccess, isAutonomous, pathname, resumeRouter]);
+
+  return null;
+}
+
+function AutonomousPaywallGuard() {
+  const { loading, profile, hasAccess } = useAuth();
+  const pathname = usePathname();
+  const paywallRouter = useRouter();
+  const isAutonomous = profile?.role === 'aluno' && Boolean(profile?.is_autonomous);
+  const allowed = PAYWALL_ALLOWED_PATHS.includes(pathname);
+
+  useEffect(() => {
+    if (!loading && isAutonomous && !hasAccess && !allowed) {
+      paywallRouter.replace('/aluno/bloqueado' as never);
+    }
+  }, [loading, isAutonomous, hasAccess, allowed, paywallRouter]);
 
   return null;
 }
@@ -88,6 +115,7 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={darkNavigation}>
         <WorkoutResumeGuard />
+        <AutonomousPaywallGuard />
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />

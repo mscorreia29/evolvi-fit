@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { StyleSheet, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,10 +10,14 @@ import { useAuth } from '@/providers/auth-provider';
 export default function StudentTabsLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { profile } = useAuth();
+  const { profile, hasAccess } = useAuth();
   const isAutonomous = Boolean(
     (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
   );
+
+  if (isAutonomous && !hasAccess) {
+    return <Redirect href={'/aluno/bloqueado' as never} />;
+  }
 
   const iconWrapper = (focused: boolean, icon: keyof typeof Ionicons.glyphMap, color: ColorValue) => (
     <View style={[styles.iconWrap, focused && { backgroundColor: theme.primarySoft }]}>

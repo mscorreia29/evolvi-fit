@@ -170,25 +170,30 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
-  // determine access for personal accounts
+  // determine access for personal and autonomous accounts
+  const isAutonomous = profile?.role === 'aluno' && Boolean(profile?.is_autonomous);
   let hasAccess = true;
   let accessExpiresAt: string | null = null;
   let blockReason: string | null = null;
-  if (profile?.role === 'personal') {
+  if (profile?.role === 'personal' || isAutonomous) {
     if (profile.status === 'blocked' || profile.status === 'rejected' || profile.status === 'pending') {
       hasAccess = false;
       blockReason = profile.block_reason ?? (profile.status === 'rejected' ? 'Conta não aprovada.' : profile.status === 'pending' ? 'Conta pendente de aprovação.' : 'Acesso bloqueado.');
     } else if (profile.status === 'trial') {
       if (profile.trial_ends_at && new Date(profile.trial_ends_at).getTime() < now) {
         hasAccess = false;
-        blockReason = 'Período de teste encerrado.';
+        blockReason = isAutonomous
+          ? 'Seu teste grátis encerrou. Renove para continuar usando o Evolvi Fit.'
+          : 'Período de teste encerrado.';
       } else {
         accessExpiresAt = profile.trial_ends_at;
       }
     } else if (profile.status === 'approved') {
       if (profile.paid_until && new Date(profile.paid_until).getTime() < now) {
         hasAccess = false;
-        blockReason = 'Acesso expirado. Renove com o administrador.';
+        blockReason = isAutonomous
+          ? 'Sua assinatura venceu. Renove para continuar usando o Evolvi Fit.'
+          : 'Acesso expirado. Renove com o administrador.';
       } else {
         accessExpiresAt = profile.paid_until;
       }
@@ -199,13 +204,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   const isTrialExpired =
-    profile?.role === 'personal' &&
+    (profile?.role === 'personal' || isAutonomous) &&
     profile?.status === 'trial' &&
     !!profile.trial_ends_at &&
     new Date(profile.trial_ends_at).getTime() < now;
   const accountBlocked = !hasAccess;
   const trialDaysLeft =
-    profile?.role === 'personal' && profile?.status === 'trial' && profile.trial_ends_at
+    (profile?.role === 'personal' || isAutonomous) &&
+    profile?.status === 'trial' &&
+    profile.trial_ends_at
       ? Math.max(0, Math.ceil((new Date(profile.trial_ends_at).getTime() - now) / 86400000))
       : null;
   const daysUntilExpiry =

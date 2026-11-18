@@ -174,6 +174,9 @@ begin
     end if;
   elsif v_role = 'admin' then
     v_status := 'approved';
+  elsif v_is_autonomous then
+    v_status := 'trial';
+    v_trial := now() + (v_trial_days || ' days')::interval;
   else
     v_status := 'approved';
   end if;

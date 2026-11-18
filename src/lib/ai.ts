@@ -265,3 +265,10 @@ export async function unlockAiRegeneration(userId: string) {
   });
   if (error) throw new Error(error.message);
 }
+
+export async function unlockAiMealRegeneration(userId: string) {
+  const { error } = await supabase.rpc('admin_unlock_ai_meal_regeneration', {
+    p_user_id: userId,
+  });
+  if (error) throw new Error(error.message);
+}

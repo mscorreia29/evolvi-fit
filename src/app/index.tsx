@@ -44,7 +44,7 @@ export default function Index() {
 
   useEffect(() => {
     let active = true;
-    if (!profile || !isAutonomous || !checkingAutonomous || checkingWorkout || activeWorkoutId) {
+    if (!profile || !isAutonomous || !hasAccess || !checkingAutonomous || checkingWorkout || activeWorkoutId) {
       return () => {
         active = false;
       };
@@ -72,7 +72,7 @@ export default function Index() {
     return () => {
       active = false;
     };
-  }, [profile, isAutonomous, checkingAutonomous, checkingWorkout, activeWorkoutId, router]);
+  }, [profile, isAutonomous, hasAccess, checkingAutonomous, checkingWorkout, activeWorkoutId, router]);
 
   if (loading) {
     return <Loading label="Carregando..." />;
@@ -84,6 +84,10 @@ export default function Index() {
 
   if (!profile) {
     return <Loading label="Carregando perfil..." />;
+  }
+
+  if (isAutonomous && !hasAccess) {
+    return <Redirect href={'/aluno/bloqueado' as never} />;
   }
 
   if (checkingWorkout) {
