@@ -274,14 +274,7 @@ async function callGemini(
   key: string,
   configuredModel: string,
 ) {
-  const models = [
-    ...new Set([
-      configuredModel,
-      'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
-      'gemini-2.5-flash-lite',
-    ]),
-  ];
+  const models = [...new Set([configuredModel, 'gemini-3.5-flash-lite', 'gemini-3.8-flash'])];
   let lastError: Error | null = null;
 
   for (const model of models) {
