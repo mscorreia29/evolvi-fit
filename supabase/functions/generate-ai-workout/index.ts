@@ -45,6 +45,13 @@ type WorkoutPlan = {
   blocks: WorkoutBlock[];
 };
 
+type LibraryExercise = {
+  id: string;
+  name: string;
+  video_url: string | null;
+  instructions: string | null;
+};
+
 const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '');
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -82,6 +89,37 @@ function extractContent(payload: any) {
   const value = geminiText || openAiText || '';
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
+}
+
+function normalizeExerciseName(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findLibraryExercise(name: string, library: LibraryExercise[]) {
+  const target = normalizeExerciseName(name);
+  const exact = library.find((item) => normalizeExerciseName(item.name) === target);
+  if (exact) return exact;
+
+  const tokens = target.split(' ').filter((token) => token.length > 2);
+  let best: LibraryExercise | null = null;
+  let bestScore = 0;
+
+  for (const item of library) {
+    const candidate = normalizeExerciseName(item.name);
+    const score = tokens.reduce((total, token) => total + (candidate.includes(token) ? 1 : 0), 0);
+    if (score > bestScore) {
+      best = item;
+      bestScore = score;
+    }
+  }
+
+  return bestScore >= 2 ? best : null;
 }
 
 function parsePlan(payload: any, maxBlocks: number): WorkoutPlan {
@@ -305,12 +343,16 @@ Deno.serve(async (req) => {
     }
 
     const maxBlocks = Math.min(7, Math.max(1, anamnesis.days_per_week));
+    const library = (await rest(
+      'exercises?select=id,name,video_url,instructions&order=name&limit=500',
+    )) as LibraryExercise[];
     const prompt = [
       `Gere exatamente ${maxBlocks} treinos/blocos separados e personalizados com base nos dados abaixo.`,
       `Cada bloco deve ter de 3 a 8 exercícios e representar uma sessão diferente. Nunca coloque todos os exercícios em um único treino.`,
       'Retorne APENAS JSON no formato: {"name":"Plano ...","workouts":[{"name":"Treino A - ...","days":[{"label":"A","exercises":[{"name":"...","sets":3,"reps":"10-12","rest_seconds":60,"notes":"..."}]}]}]}.',
       'Use labels A, B, C... e nomes diferentes para cada bloco.',
       'Use somente exercícios seguros e adequados ao histórico informado.',
+      `Use preferencialmente estes nomes da biblioteca de exercícios: ${library.map((item) => item.name).slice(0, 200).join(' | ')}`,
       `Duração por sessão: ${anamnesis.session_minutes} minutos.`,
       JSON.stringify(anamnesis, null, 2),
     ].join('\n');
@@ -360,16 +402,19 @@ Deno.serve(async (req) => {
 
       for (let exerciseIndex = 0; exerciseIndex < block.day.exercises.length; exerciseIndex += 1) {
         const exercise = block.day.exercises[exerciseIndex];
+        const match = findLibraryExercise(exercise.name, library);
         await rest('workout_exercises', {
           method: 'POST',
           body: JSON.stringify({
             workout_day_id: dayId,
-            exercise_id: null,
+            exercise_id: match?.id ?? null,
             name: exercise.name,
             sets: exercise.sets,
             reps: exercise.reps,
             rest_seconds: exercise.rest_seconds,
             notes: exercise.notes,
+            video_url: match?.video_url ?? null,
+            instructions: match?.instructions ?? null,
             order_index: exerciseIndex,
           }),
         });
