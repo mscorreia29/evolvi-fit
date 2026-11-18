@@ -272,3 +272,15 @@ export async function unlockAiMealRegeneration(userId: string) {
   });
   if (error) throw new Error(error.message);
 }
+
+export async function saveAiMealPreferences(
+  userId: string,
+  favoriteFoods: string,
+  mealRoutine: string,
+) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ ai_meal_favorite_foods: favoriteFoods, ai_meal_routine: mealRoutine })
+    .eq('id', userId);
+  if (error) throw new Error(error.message);
+}

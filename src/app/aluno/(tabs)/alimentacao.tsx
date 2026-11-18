@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { generateAiMealPlan } from '@/lib/ai';
+import { generateAiMealPlan, saveAiMealPreferences } from '@/lib/ai';
 import { formatDate } from '@/lib/format';
 import { getMealPlan, mealPlanCalories } from '@/lib/nutrition';
 import type { Meal, MealPlan } from '@/lib/types';
@@ -34,6 +34,8 @@ export default function StudentNutritionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [formMode, setFormMode] = useState<'generate' | 'save'>('generate');
+  const [savingForm, setSavingForm] = useState(false);
   const [favoriteFoods, setFavoriteFoods] = useState(profile?.ai_meal_favorite_foods ?? '');
   const [mealRoutine, setMealRoutine] = useState(profile?.ai_meal_routine ?? '');
   const [formError, setFormError] = useState<string | null>(null);
@@ -78,7 +80,29 @@ export default function StudentNutritionScreen() {
     }
   }
 
-  function openForm() {
+  async function savePreferences(preferences: { favoriteFoods: string; mealRoutine: string }) {
+    if (!profile) return false;
+    setSavingForm(true);
+    setNotice(null);
+    setError(null);
+    try {
+      await saveAiMealPreferences(profile.id, preferences.favoriteFoods, preferences.mealRoutine);
+      setNotice('Ficha alimentar salva. Seu plano atual foi mantido.');
+      return true;
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Não foi possível salvar a ficha alimentar.',
+      );
+      return false;
+    } finally {
+      setSavingForm(false);
+    }
+  }
+
+  function openForm(mode: 'generate' | 'save') {
+    setFormMode(mode);
     setFavoriteFoods(profile?.ai_meal_favorite_foods ?? '');
     setMealRoutine(profile?.ai_meal_routine ?? '');
     setFormError(null);
@@ -86,15 +110,7 @@ export default function StudentNutritionScreen() {
   }
 
   function handleGeneratePlan() {
-    if (!plan) {
-      openForm();
-      return;
-    }
-
-    Alert.alert('Gerar novo plano?', 'O plano atual será substituído pelo novo plano da IA.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Preencher ficha', onPress: openForm },
-    ]);
+    openForm('generate');
   }
 
   async function handleSubmitForm() {
@@ -106,7 +122,9 @@ export default function StudentNutritionScreen() {
     }
 
     setFormError(null);
-    const success = await generatePlan({ favoriteFoods: foods, mealRoutine: routine });
+    const preferences = { favoriteFoods: foods, mealRoutine: routine };
+    const success =
+      formMode === 'generate' ? await generatePlan(preferences) : await savePreferences(preferences);
     if (success) setShowForm(false);
   }
 
@@ -146,12 +164,18 @@ export default function StudentNutritionScreen() {
         <Card style={[styles.aiCard, { borderColor: Brand.primary }]}>
           <SectionHeader
             title="Plano alimentar com IA"
-            subtitle="Preencha a ficha com seus gostos e rotina para a IA montar o plano."
+            subtitle="Preencha ou edite sua ficha: gere um novo plano ou salve só as respostas."
           />
           <Button
             title={plan ? 'Gerar novo plano com IA' : 'Criar plano com IA'}
             onPress={handleGeneratePlan}
             loading={generating}
+            variant="secondary"
+          />
+          <Button
+            title="Editar ficha"
+            onPress={() => openForm('save')}
+            loading={savingForm}
             variant="secondary"
           />
           {notice ? <Text style={[styles.aiFeedback, { color: Brand.primary }]}>{notice}</Text> : null}
@@ -216,11 +240,16 @@ export default function StudentNutritionScreen() {
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
                 <Ionicons name="restaurant-outline" size={20} color={Brand.primary} />
-                <Text style={[styles.modalTitle, { color: theme.text }]}>Ficha alimentar</Text>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>
+                  {formMode === 'save' ? 'Editar ficha alimentar' : 'Ficha alimentar'}
+                </Text>
               </View>
               <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
-                Conte o que você mais gosta de comer e como é sua rotina. A IA vai montar as
-                refeições a partir disso.
+                {formMode === 'save'
+                  ? 'Atualize suas respostas. Seu plano atual continua o mesmo.'
+                  : plan
+                    ? 'Ao enviar, o plano atual será substituído pelo novo plano da IA.'
+                    : 'A IA vai montar seu plano a partir das suas respostas.'}
               </Text>
               <TextField
                 label="O que você mais gosta de comer?"
@@ -251,9 +280,10 @@ export default function StudentNutritionScreen() {
                   style={styles.modalButton}
                 />
                 <Button
-                  title="Montar plano"
+                  title={formMode === 'generate' ? 'Montar plano' : 'Salvar ficha'}
                   onPress={() => void handleSubmitForm()}
-                  loading={generating}
+                  loading={formMode === 'generate' ? generating : savingForm}
+                  disabled={generating || savingForm}
                   style={styles.modalButton}
                 />
               </View>
