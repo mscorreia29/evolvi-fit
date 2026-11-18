@@ -6,7 +6,7 @@
     <title>Evolvi Fit — Treinos, alimentação e IA</title>
     <meta
       name="description"
-      content="Evolvi Fit é a plataforma para personais trainers, alunos vinculados e autônomos: treinos, alimentação com IA e cálculo calórico, anamnese, avaliação física, comunicação, pagamentos, notificações e Admin Master."
+      content="Evolvi Fit é a plataforma para personais trainers, alunos vinculados e autônomos: treinos, alimentação com IA e cálculo calórico, anamnese, avaliação física, comunicação, pagamentos e notificações."
     />
     <meta name="theme-color" content="#10182E" />
     <link rel="icon" href="assets/favicon-32.png" sizes="32x32" />
@@ -154,7 +154,7 @@
           <div><svg><use href="#i-users" /></svg><span>Personal trainers</span></div>
           <div><svg><use href="#i-dumbbell" /></svg><span>Alunos vinculados</span></div>
           <div><svg><use href="#i-spark" /></svg><span>Autônomos e plano IA</span></div>
-          <div><svg><use href="#i-shield" /></svg><span>Admin Master</span></div>
+          <div><svg><use href="#i-shield" /></svg><span>Gestão de acessos</span></div>
         </div>
       </section>
 
@@ -189,8 +189,8 @@
             <span class="feature-icon"><svg><use href="#i-spark" /></svg></span>
             <h3>Para escalar</h3>
             <p>
-              Cadastro autônomo com IA, gestão financeira manual, admin master, controle de
-              autônomos, auditoria e fallback entre provedores de IA.
+              Cadastro autônomo com IA, gestão financeira manual, controle de acessos e fallback
+              automático entre provedores de IA.
             </p>
           </article>
         </div>
@@ -246,26 +246,11 @@
               <article><svg><use href="#i-spark" /></svg><div><h4>Planos gerados por IA</h4><p>Treinos e alimentação são montados com Gemini ou OpenAI, com fallback automático entre provedores.</p></div></article>
               <article><svg><use href="#i-flame" /></svg><div><h4>Meta calórica</h4><p>Idade, peso, altura, treinos e objetivo definem gasto diário e o quanto comer para emagrecer, manter ou ganhar massa.</p></div></article>
               <article><svg><use href="#i-dumbbell" /></svg><div><h4>Mesma experiência</h4><p>Os planos aparecem nas abas de treinos e alimentação, com o mesmo player e recursos dos demais alunos.</p></div></article>
-              <article><svg><use href="#i-shield" /></svg><div><h4>Limite controlado</h4><p>Intervalo entre gerações de treino e plano alimentar, com liberação manual pelo Admin Master.</p></div></article>
-              <article><svg><use href="#i-bell" /></svg><div><h4>Chave segura</h4><p>A chave de IA fica no servidor, em secrets do Supabase ou no painel admin, nunca no bundle web.</p></div></article>
+              <article><svg><use href="#i-shield" /></svg><div><h4>Limite controlado</h4><p>Intervalo entre gerações de treino e plano alimentar, com liberação manual quando necessário.</p></div></article>
+              <article><svg><use href="#i-bell" /></svg><div><h4>Chave segura</h4><p>A chave de IA fica no servidor, em configurações protegidas, nunca no bundle web.</p></div></article>
             </div>
           </div>
 
-          <div class="audience">
-            <div class="audience-title">
-              <span class="audience-badge admin">Admin Master</span>
-              <h3>Controle global do sistema</h3>
-            </div>
-            <div class="feature-grid">
-              <article><svg><use href="#i-users" /></svg><div><h4>Personais</h4><p>Aprovar, rejeitar, bloquear, liberar dias de acesso, criar conta, trocar email e redefinir senha.</p></div></article>
-              <article><svg><use href="#i-spark" /></svg><div><h4>Autônomos</h4><p>Editar dados, bloquear, estender teste, registrar pagamento, revogar acesso e destravar gerações de IA.</p></div></article>
-              <article><svg><use href="#i-chart" /></svg><div><h4>Painel e métricas</h4><p>Contadores de personais, alunos vinculados, autônomos, cobranças pendentes, bloqueios e auditoria.</p></div></article>
-              <article><svg><use href="#i-card" /></svg><div><h4>Cobranças e pagamentos</h4><p>Visão de todas as cobranças, filtros por status e ações de pago/cancelado.</p></div></article>
-              <article><svg><use href="#i-spark" /></svg><div><h4>Configurações de IA</h4><p>Ativar cadastro autônomo, escolher provedor, modelo, prompt, intervalo e regeneração livre.</p></div></article>
-              <article><svg><use href="#i-shield" /></svg><div><h4>Regras globais</h4><p>Dias de teste, auto-cadastro de personais, bloqueio de trial vencido e limite de alunos.</p></div></article>
-              <article><svg><use href="#i-check" /></svg><div><h4>Auditoria</h4><p>Registro de bloqueios, status, acessos, alterações de email, senhas e configurações.</p></div></article>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -296,7 +281,7 @@
               <li><svg><use href="#i-check" /></svg>Até 7 dias e 25 exercícios por dia com vídeo</li>
               <li><svg><use href="#i-check" /></svg>5 refeições, 6 opções completas e calorias por opção</li>
               <li><svg><use href="#i-check" /></svg>Restrições, lesões e preferências no prompt</li>
-              <li><svg><use href="#i-check" /></svg>Regeneração controlada pelo Admin Master</li>
+              <li><svg><use href="#i-check" /></svg>Regeneração controlada por regras de uso</li>
             </ul>
             <a class="link-arrow" href="https://evolvi-fit.vercel.app/signup-autonomo">
               Quero meu treino com IA <svg><use href="#i-arrow" /></svg>
@@ -397,8 +382,9 @@
               <span class="feature-icon"><svg><use href="#i-spark" /></svg></span>
               <h3>IA server-side</h3>
               <p>
-                Edge Functions validam JWT, usam service role apenas no servidor e leem chaves de
-                secrets ou de configuração administrativa.
+                 Edge Functions validam JWT, usam service role apenas no servidor e leem chaves de
+                 configurações protegidas.
+
               </p>
             </article>
             <article class="feature-card">
@@ -421,15 +407,15 @@
           <span class="kicker">ACESSO</span>
           <h2>Como funciona a liberação</h2>
           <p>
-            O sistema usa teste de 7 dias e liberação administrativa. Não existe checkout online ou
-            assinatura automática: o Admin Master registra pagamentos manualmente.
+            O sistema usa teste de 7 dias e liberação manual. Não existe checkout online ou
+            assinatura automática: os pagamentos são registrados manualmente.
           </p>
         </div>
         <div class="three-cols">
           <article class="plan-card">
             <span class="plan-name">Personal trainer</span>
             <strong>7 dias de teste</strong>
-            <p>Padrão configurável pelo Admin Master. Contas pendentes, rejeitadas ou bloqueadas não entram.</p>
+            <p>Período padrão de teste. Contas pendentes, rejeitadas ou bloqueadas não entram.</p>
           </article>
           <article class="plan-card featured">
             <span class="plan-name">Aluno</span>
@@ -453,8 +439,8 @@
           <details open>
             <summary>Posso usar sem personal trainer?</summary>
             <p>
-              Sim. Quando o Admin Master habilita o módulo, você pode se cadastrar como aluno
-              autônomo, preencher a anamnese e receber um treino gerado por IA.
+              Sim. Quando o módulo está habilitado, você pode se cadastrar como aluno autônomo,
+              preencher a anamnese e receber um treino gerado por IA.
             </p>
           </details>
           <details>
@@ -475,15 +461,15 @@
           <details>
             <summary>Alunos vinculados também usam alimentação com IA?</summary>
             <p>
-              Sim. O plano é salvo no vínculo com o personal, respeitando permissões e a configuração
-              de geração feita pelo Admin Master.
+              Sim. O plano é salvo no vínculo com o personal, respeitando permissões e as regras de
+              geração definidas para a conta.
             </p>
           </details>
           <details>
             <summary>Quais provedores de IA são suportados?</summary>
             <p>
               Gemini e OpenAI, com fallback automático entre eles. A escolha, o modelo e a chave ficam
-              no painel Admin Master ou em secrets do Supabase.
+              em configurações protegidas do sistema.
             </p>
           </details>
           <details>
