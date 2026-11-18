@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { AiMealPreferences } from '@/lib/types';
 
 export type AiProvider = 'gemini' | 'openai';
 
@@ -160,6 +161,7 @@ export async function generateAiWorkout(payload: AutonomousAnamnesis) {
 export async function generateAiMealPlan(input?: {
   favoriteFoods?: string;
   mealRoutine?: string;
+  mealPreferences?: AiMealPreferences;
   notes?: string;
 }) {
   const { data: sessionData } = await supabase.auth.getSession();
@@ -172,6 +174,7 @@ export async function generateAiMealPlan(input?: {
     body: {
       favorite_foods: input?.favoriteFoods?.trim() ?? '',
       meal_routine: input?.mealRoutine?.trim() ?? '',
+      meal_preferences: input?.mealPreferences ?? null,
       notes: input?.notes ?? '',
     },
     headers: {
@@ -277,10 +280,15 @@ export async function saveAiMealPreferences(
   userId: string,
   favoriteFoods: string,
   mealRoutine: string,
+  mealPreferences: AiMealPreferences,
 ) {
   const { error } = await supabase
     .from('profiles')
-    .update({ ai_meal_favorite_foods: favoriteFoods, ai_meal_routine: mealRoutine })
+    .update({
+      ai_meal_favorite_foods: favoriteFoods,
+      ai_meal_routine: mealRoutine,
+      ai_meal_preferences: mealPreferences,
+    })
     .eq('id', userId);
   if (error) throw new Error(error.message);
 }

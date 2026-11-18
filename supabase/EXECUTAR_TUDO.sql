@@ -1706,7 +1706,8 @@ alter table public.profiles
   add column if not exists ai_meal_generation_count integer not null default 0,
   add column if not exists ai_meal_regeneration_unlocked boolean not null default false,
   add column if not exists ai_meal_favorite_foods text,
-  add column if not exists ai_meal_routine text;
+  add column if not exists ai_meal_routine text,
+  add column if not exists ai_meal_preferences jsonb not null default '{}'::jsonb;
 
 create index if not exists profiles_autonomous_idx on public.profiles(is_autonomous) where is_autonomous;
 

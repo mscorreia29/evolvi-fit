@@ -9,7 +9,7 @@ const mealSystemPrompt = [
   'Responda APENAS com JSON no formato: {"title":"Plano alimentar personalizado","notes":"Orientações gerais","meals":[{"name":"Café da manhã","time":"07:30","notes":"Escolha 1 opção desta refeição.","items":[{"name":"Ovos mexidos com pão integral e mamão","quantity":"1 porção","calories":320}]}]}.',
   'Cada item de "items" deve ser uma OPÇÃO COMPLETA de refeição ou prato, com nome que descreva a combinação. Nunca liste alimentos soltos como opções separadas.',
   'Gere exatamente 5 refeições, cada uma com exatamente 6 opções completas diferentes e intercambiáveis. As calorias devem ser da opção inteira.',
-  'Use obrigatoriamente os alimentos que a pessoa mais gosta e adapte as opções à rotina alimentar informada na ficha.',
+  'Use obrigatoriamente os alimentos que a pessoa mais gosta. Quando a ficha trouxer preferências por refeição (café, lanche, almoço, jantar e frutas), respeite cada uma na refeição correspondente e adapte o restante à rotina informada.',
   'Em todas as refeições, preencha notes exatamente com "Escolha 1 opção desta refeição."',
   'Respeite objetivo, restrições, lesões, idade, peso, altura e preferências informadas.',
   'Não prescreva medicamentos, suplementos obrigatórios ou dietas radicais. Em caso de dúvida, priorize alimentos naturais e oriente procurar um profissional presencial.',
@@ -33,6 +33,16 @@ type Profile = {
   ai_meal_regeneration_unlocked: boolean;
   ai_meal_favorite_foods: string | null;
   ai_meal_routine: string | null;
+  ai_meal_preferences: Record<string, unknown> | null;
+};
+
+type MealPreferences = {
+  breakfast: string;
+  snack: string;
+  lunch: string;
+  dinner: string;
+  fruits: string;
+  routine: string;
 };
 
 type MealItem = {
@@ -249,7 +259,20 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const favoriteFoods = String(payload?.favorite_foods ?? '').trim().slice(0, 1000);
     const mealRoutine = String(payload?.meal_routine ?? '').trim().slice(0, 1000);
-    const hasNewPreferences = Boolean(favoriteFoods || mealRoutine);
+    const rawPreferences =
+      payload?.meal_preferences && typeof payload.meal_preferences === 'object'
+        ? payload.meal_preferences
+        : {};
+    const mealPreferences: MealPreferences = {
+      breakfast: String(rawPreferences.breakfast ?? '').trim().slice(0, 300),
+      snack: String(rawPreferences.snack ?? '').trim().slice(0, 300),
+      lunch: String(rawPreferences.lunch ?? '').trim().slice(0, 300),
+      dinner: String(rawPreferences.dinner ?? '').trim().slice(0, 300),
+      fruits: String(rawPreferences.fruits ?? '').trim().slice(0, 300),
+      routine: mealRoutine,
+    };
+    const hasStructuredPreferences = Object.values(mealPreferences).some(Boolean);
+    const hasNewPreferences = Boolean(favoriteFoods || mealRoutine || hasStructuredPreferences);
 
     const settingsRows = (await rest('ai_settings?id=eq.1&select=*')) as Settings[];
     const settings = settingsRows?.[0];
@@ -258,7 +281,7 @@ Deno.serve(async (req) => {
     }
 
     const profileRows = (await rest(
-      `profiles?id=eq.${encodeURIComponent(user.id)}&select=is_autonomous,full_name,ai_meal_last_generated_at,ai_meal_generation_count,ai_meal_regeneration_unlocked,ai_meal_favorite_foods,ai_meal_routine`,
+      `profiles?id=eq.${encodeURIComponent(user.id)}&select=is_autonomous,full_name,ai_meal_last_generated_at,ai_meal_generation_count,ai_meal_regeneration_unlocked,ai_meal_favorite_foods,ai_meal_routine,ai_meal_preferences`,
     )) as Profile[];
     const profile = profileRows?.[0];
     if (!profile?.is_autonomous) {
@@ -311,6 +334,9 @@ Deno.serve(async (req) => {
       favorite_foods:
         favoriteFoods || profile.ai_meal_favorite_foods || anamnesis.favorite_foods || null,
       meal_routine: mealRoutine || profile.ai_meal_routine || anamnesis.meal_routine || null,
+      meal_preferences: hasStructuredPreferences
+        ? mealPreferences
+        : profile.ai_meal_preferences ?? null,
       notes: String(payload?.notes ?? payload?.preferences ?? anamnesis.notes ?? '').slice(0, 500),
     };
 
@@ -367,6 +393,7 @@ Deno.serve(async (req) => {
         ai_meal_regeneration_unlocked: false,
         ...(favoriteFoods ? { ai_meal_favorite_foods: favoriteFoods } : {}),
         ...(mealRoutine ? { ai_meal_routine: mealRoutine } : {}),
+        ...(hasStructuredPreferences ? { ai_meal_preferences: mealPreferences } : {}),
       }),
     });
 

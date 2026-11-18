@@ -17,8 +17,32 @@ import { useTheme } from '@/hooks/use-theme';
 import { generateAiMealPlan, saveAiMealPreferences } from '@/lib/ai';
 import { formatDate } from '@/lib/format';
 import { getMealPlan, mealPlanCalories } from '@/lib/nutrition';
-import type { Meal, MealPlan } from '@/lib/types';
+import type { AiMealPreferences, Meal, MealPlan } from '@/lib/types';
 import { useAuth } from '@/providers/auth-provider';
+
+type MealPreferenceKey = 'breakfast' | 'snack' | 'lunch' | 'dinner' | 'fruits';
+
+const MEAL_PREFERENCE_FIELDS: {
+  key: MealPreferenceKey;
+  label: string;
+  placeholder: string;
+}[] = [
+  { key: 'breakfast', label: 'Café da manhã', placeholder: 'Ex.: ovos, pão integral, café com leite' },
+  { key: 'snack', label: 'Lanche', placeholder: 'Ex.: iogurte, castanhas, biscoito integral' },
+  { key: 'lunch', label: 'Almoço', placeholder: 'Ex.: arroz, feijão, frango grelhado, salada' },
+  { key: 'dinner', label: 'Jantar', placeholder: 'Ex.: sopa, peixe, omelete, salada leve' },
+  { key: 'fruits', label: 'Frutas', placeholder: 'Ex.: banana, maçã, mamão, morango' },
+];
+
+function buildFavoriteFoods(preferences: AiMealPreferences) {
+  return MEAL_PREFERENCE_FIELDS.map((field) => ({
+    label: field.label,
+    value: (preferences[field.key] ?? '').trim(),
+  }))
+    .filter((field) => field.value.length > 0)
+    .map((field) => `${field.label}: ${field.value}`)
+    .join(' | ');
+}
 
 export default function StudentNutritionScreen() {
   const theme = useTheme();
@@ -36,8 +60,16 @@ export default function StudentNutritionScreen() {
   const [showForm, setShowForm] = useState(false);
   const [formMode, setFormMode] = useState<'generate' | 'save'>('generate');
   const [savingForm, setSavingForm] = useState(false);
-  const [favoriteFoods, setFavoriteFoods] = useState(profile?.ai_meal_favorite_foods ?? '');
-  const [mealRoutine, setMealRoutine] = useState(profile?.ai_meal_routine ?? '');
+  const [mealPreferences, setMealPreferences] = useState<AiMealPreferences>(() => ({
+    breakfast: profile?.ai_meal_preferences?.breakfast ?? '',
+    snack: profile?.ai_meal_preferences?.snack ?? '',
+    lunch: profile?.ai_meal_preferences?.lunch ?? '',
+    dinner: profile?.ai_meal_preferences?.dinner ?? '',
+    fruits: profile?.ai_meal_preferences?.fruits ?? '',
+  }));
+  const [mealRoutine, setMealRoutine] = useState(
+    profile?.ai_meal_preferences?.routine ?? profile?.ai_meal_routine ?? '',
+  );
   const [formError, setFormError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -59,12 +91,16 @@ export default function StudentNutritionScreen() {
     setRefreshing(false);
   }
 
-  async function generatePlan(preferences: { favoriteFoods: string; mealRoutine: string }) {
+  async function generatePlan(input: {
+    favoriteFoods: string;
+    mealRoutine: string;
+    mealPreferences: AiMealPreferences;
+  }) {
     setGenerating(true);
     setNotice(null);
     setError(null);
     try {
-      const result = await generateAiMealPlan(preferences);
+      const result = await generateAiMealPlan(input);
       setNotice(`${result.title} criado com ${result.mealsCount} refeições.`);
       await load();
       return true;
@@ -80,14 +116,23 @@ export default function StudentNutritionScreen() {
     }
   }
 
-  async function savePreferences(preferences: { favoriteFoods: string; mealRoutine: string }) {
+  async function savePreferences(input: {
+    favoriteFoods: string;
+    mealRoutine: string;
+    mealPreferences: AiMealPreferences;
+  }) {
     if (!profile) return false;
     setSavingForm(true);
     setNotice(null);
     setError(null);
     try {
-      await saveAiMealPreferences(profile.id, preferences.favoriteFoods, preferences.mealRoutine);
-      setNotice('Ficha alimentar salva. Seu plano atual foi mantido.');
+      await saveAiMealPreferences(
+        profile.id,
+        input.favoriteFoods,
+        input.mealRoutine,
+        input.mealPreferences,
+      );
+      setNotice('Ficha por refeição salva. Seu plano atual foi mantido.');
       return true;
     } catch (saveError) {
       setError(
@@ -102,9 +147,16 @@ export default function StudentNutritionScreen() {
   }
 
   function openForm(mode: 'generate' | 'save') {
+    const saved = profile?.ai_meal_preferences;
     setFormMode(mode);
-    setFavoriteFoods(profile?.ai_meal_favorite_foods ?? '');
-    setMealRoutine(profile?.ai_meal_routine ?? '');
+    setMealPreferences({
+      breakfast: saved?.breakfast ?? '',
+      snack: saved?.snack ?? '',
+      lunch: saved?.lunch ?? '',
+      dinner: saved?.dinner ?? '',
+      fruits: saved?.fruits ?? '',
+    });
+    setMealRoutine(saved?.routine ?? profile?.ai_meal_routine ?? '');
     setFormError(null);
     setShowForm(true);
   }
@@ -114,17 +166,31 @@ export default function StudentNutritionScreen() {
   }
 
   async function handleSubmitForm() {
-    const foods = favoriteFoods.trim();
     const routine = mealRoutine.trim();
-    if (foods.length < 5 || routine.length < 5) {
-      setFormError('Conte um pouco mais sobre seus alimentos favoritos e sua rotina.');
+    const structured: AiMealPreferences = {
+      breakfast: mealPreferences.breakfast?.trim() ?? '',
+      snack: mealPreferences.snack?.trim() ?? '',
+      lunch: mealPreferences.lunch?.trim() ?? '',
+      dinner: mealPreferences.dinner?.trim() ?? '',
+      fruits: mealPreferences.fruits?.trim() ?? '',
+      routine,
+    };
+    const hasFood = MEAL_PREFERENCE_FIELDS.some(
+      (field) => (structured[field.key] ?? '').length >= 3,
+    );
+    if (!hasFood || routine.length < 5) {
+      setFormError('Preencha pelo menos uma refeição e conte um pouco sobre sua rotina.');
       return;
     }
 
     setFormError(null);
-    const preferences = { favoriteFoods: foods, mealRoutine: routine };
+    const input = {
+      favoriteFoods: buildFavoriteFoods(structured),
+      mealRoutine: routine,
+      mealPreferences: structured,
+    };
     const success =
-      formMode === 'generate' ? await generatePlan(preferences) : await savePreferences(preferences);
+      formMode === 'generate' ? await generatePlan(input) : await savePreferences(input);
     if (success) setShowForm(false);
   }
 
@@ -164,7 +230,7 @@ export default function StudentNutritionScreen() {
         <Card style={[styles.aiCard, { borderColor: Brand.primary }]}>
           <SectionHeader
             title="Plano alimentar com IA"
-            subtitle="Preencha ou edite sua ficha: gere um novo plano ou salve só as respostas."
+            subtitle="Monte sua ficha por refeição: gere um novo plano ou salve só as respostas."
           />
           <Button
             title={plan ? 'Gerar novo plano com IA' : 'Criar plano com IA'}
@@ -240,33 +306,36 @@ export default function StudentNutritionScreen() {
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
                 <Ionicons name="restaurant-outline" size={20} color={Brand.primary} />
-                <Text style={[styles.modalTitle, { color: theme.text }]}>
-                  {formMode === 'save' ? 'Editar ficha alimentar' : 'Ficha alimentar'}
-                </Text>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Ficha por refeição</Text>
               </View>
               <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
                 {formMode === 'save'
-                  ? 'Atualize suas respostas. Seu plano atual continua o mesmo.'
+                  ? 'Atualize o que você gosta em cada refeição. Seu plano atual continua o mesmo.'
                   : plan
-                    ? 'Ao enviar, o plano atual será substituído pelo novo plano da IA.'
-                    : 'A IA vai montar seu plano a partir das suas respostas.'}
+                    ? 'Ao enviar, o plano atual será substituído. Conte o que você gosta em cada refeição.'
+                    : 'Conte o que você gosta em cada refeição para a IA montar seu plano.'}
               </Text>
+              {MEAL_PREFERENCE_FIELDS.map((field) => (
+                <TextField
+                  key={field.key}
+                  label={field.label}
+                  value={mealPreferences[field.key] ?? ''}
+                  onChangeText={(value) =>
+                    setMealPreferences((current) => ({ ...current, [field.key]: value }))
+                  }
+                  placeholder={field.placeholder}
+                  multiline
+                  numberOfLines={2}
+                  textAlignVertical="top"
+                />
+              ))}
               <TextField
-                label="O que você mais gosta de comer?"
-                value={favoriteFoods}
-                onChangeText={setFavoriteFoods}
-                placeholder="Ex.: arroz com feijão, frango grelhado, iogurte com frutas..."
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-              <TextField
-                label="Como é sua rotina alimentar?"
+                label="Rotina alimentar"
                 value={mealRoutine}
                 onChangeText={setMealRoutine}
                 placeholder="Ex.: 5 refeições por dia, almoço fora de casa, jantar leve..."
                 multiline
-                numberOfLines={4}
+                numberOfLines={3}
                 textAlignVertical="top"
               />
               {formError ? (

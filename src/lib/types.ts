@@ -1,5 +1,14 @@
 export type Role = 'admin' | 'personal' | 'aluno';
 
+export type AiMealPreferences = {
+  breakfast?: string;
+  snack?: string;
+  lunch?: string;
+  dinner?: string;
+  fruits?: string;
+  routine?: string;
+};
+
 export type AccountStatus = 'pending' | 'trial' | 'approved' | 'rejected' | 'blocked';
 
 export type AdminSettings = {
@@ -50,6 +59,7 @@ export type Profile = {
   ai_meal_regeneration_unlocked?: boolean;
   ai_meal_favorite_foods?: string | null;
   ai_meal_routine?: string | null;
+  ai_meal_preferences?: AiMealPreferences | null;
   cover_url: string | null;
   created_at: string;
 };
