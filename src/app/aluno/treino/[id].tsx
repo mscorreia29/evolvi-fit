@@ -132,6 +132,8 @@ function exerciseDetails(exercise: WorkoutExercise) {
 function InlineExerciseVideo({ url, title }: { url: string; title: string }) {
   const player = useVideoPlayer(url, (instance) => {
     instance.loop = true;
+    instance.muted = true;
+    instance.play();
   });
 
   return (

@@ -16,6 +16,7 @@ type ExerciseVideoModalProps = {
 function VideoContent({ videoUrl }: { videoUrl: string }) {
   const player = useVideoPlayer(videoUrl, (instance) => {
     instance.loop = true;
+    instance.muted = true;
     instance.play();
   });
 
