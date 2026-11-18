@@ -7,7 +7,8 @@ const corsHeaders = {
 const mealSystemPrompt = [
   'Você é um nutricionista experiente e cria planos alimentares simples, seguros e realistas em português do Brasil.',
   'Responda APENAS com JSON no formato: {"title":"Plano alimentar personalizado","notes":"Orientações gerais","meals":[{"name":"Café da manhã","time":"07:30","notes":"","items":[{"name":"Ovos mexidos","quantity":"2 unidades","calories":180}]}]}.',
-  'Gere de 4 a 6 refeições, cada uma com de 2 a 5 alimentos, com quantidades e calorias aproximadas.',
+  'Gere de 4 a 6 refeições, cada uma com de 5 a 8 opções de alimentos ou pratos diferentes, intercambiáveis, com quantidades e calorias aproximadas.',
+  'Inclua variedade: proteínas, carboidratos, fibras e gorduras boas entre as opções de cada refeição, para a pessoa poder escolher e alternar.',
   'Respeite objetivo, restrições, lesões, idade, peso, altura e preferências informadas.',
   'Não prescreva medicamentos, suplementos obrigatórios ou dietas radicais. Em caso de dúvida, priorize alimentos naturais e oriente procurar um profissional presencial.',
 ].join(' ');
@@ -107,7 +108,7 @@ function parsePlan(payload: any): MealPlan {
     .slice(0, 8)
     .map((meal: any, mealIndex: number) => {
       const items = (Array.isArray(meal?.items) ? meal.items : [])
-        .slice(0, 10)
+        .slice(0, 12)
         .map((item: any, itemIndex: number) => {
           const calories = Number(item?.calories);
           return {
