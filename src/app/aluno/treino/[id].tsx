@@ -311,6 +311,7 @@ export default function WorkoutSessionScreen() {
   const restActive = restEndsAt !== null && restRemaining > 0;
   const completedCount = exercises.filter((exercise) => done[exercise.id]).length;
   const allDone = exercises.length > 0 && completedCount === exercises.length;
+  const isLastExercise = exercises.length > 0 && activeIndex === exercises.length - 1;
   const vibratedFor = useRef<number | null>(null);
 
   useEffect(() => {
@@ -921,25 +922,27 @@ export default function WorkoutSessionScreen() {
             ))}
           </View>
 
-          <View style={[styles.finishFooter, { borderColor: theme.border }]}>
-            <View style={styles.finishFooterCopy}>
-              <Text style={[styles.finishFooterTitle, { color: theme.text }]}>
-                {allDone ? 'Todos os exercícios concluídos' : `${completedCount} de ${exercises.length} concluídos`}
-              </Text>
-              <Text style={[styles.finishFooterHint, { color: theme.textSecondary }]}>
-                {allDone
-                  ? 'Registre sua sessão e veja o resultado.'
-                  : 'Você pode finalizar mesmo sem marcar todos.'}
-              </Text>
+          {isLastExercise ? (
+            <View style={[styles.finishFooter, { borderColor: theme.border }]}>
+              <View style={styles.finishFooterCopy}>
+                <Text style={[styles.finishFooterTitle, { color: theme.text }]}>
+                  {allDone ? 'Todos os exercícios concluídos' : `${completedCount} de ${exercises.length} concluídos`}
+                </Text>
+                <Text style={[styles.finishFooterHint, { color: theme.textSecondary }]}>
+                  {allDone
+                    ? 'Registre sua sessão e veja o resultado.'
+                    : 'Você pode finalizar mesmo sem marcar todos.'}
+                </Text>
+              </View>
+              <Button
+                title={saving ? 'Salvando...' : 'Finalizar treino'}
+                onPress={finishWorkout}
+                disabled={saving}
+                variant={allDone ? 'primary' : 'secondary'}
+                style={styles.finishFooterButton}
+              />
             </View>
-            <Button
-              title={saving ? 'Salvando...' : 'Finalizar treino'}
-              onPress={finishWorkout}
-              disabled={saving}
-              variant={allDone ? 'primary' : 'secondary'}
-              style={styles.finishFooterButton}
-            />
-          </View>
+          ) : null}
           </ScrollView>
         </>
       ) : (
