@@ -56,6 +56,7 @@ type FinishResult = {
   duration: number;
   calories: number;
   loadKg: number;
+  completedCount: number;
 };
 
 function firstNumber(value?: string | null) {
@@ -310,8 +311,6 @@ export default function WorkoutSessionScreen() {
   const restRemaining = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
   const restActive = restEndsAt !== null && restRemaining > 0;
   const completedCount = exercises.filter((exercise) => done[exercise.id]).length;
-  const allDone = exercises.length > 0 && completedCount === exercises.length;
-  const isLastExercise = exercises.length > 0 && activeIndex === exercises.length - 1;
   const vibratedFor = useRef<number | null>(null);
 
   useEffect(() => {
@@ -416,12 +415,14 @@ export default function WorkoutSessionScreen() {
     ]);
   }
 
-  async function finishWorkout() {
+  async function finishWorkout(completedExerciseId?: string) {
     if (!workout || !profile) return;
 
     setSaving(true);
     setError(null);
 
+    const finalDone = completedExerciseId ? { ...done, [completedExerciseId]: true } : done;
+    const finalCompletedCount = exercises.filter((exercise) => finalDone[exercise.id]).length;
     const duration = Math.floor((Date.now() - startedAt) / 1000);
     const loadKg = exercises.reduce(
       (total, exercise) => total + Math.max(0, firstNumber(logs[exercise.id]?.weight)),
@@ -438,7 +439,7 @@ export default function WorkoutSessionScreen() {
         student_id: profile.id,
         duration_seconds: duration,
         completed: true,
-        notes: `${completedCount}/${exercises.length} exercícios concluídos`,
+        notes: `${finalCompletedCount}/${exercises.length} exercícios concluídos`,
       })
       .select('id')
       .single();
@@ -461,7 +462,7 @@ export default function WorkoutSessionScreen() {
         sets_done: Number.isFinite(sets) && values.sets.trim() ? sets : null,
         reps_done: values.reps.trim() || null,
         weight_kg: Number.isFinite(weight) && values.weight.trim() ? weight : null,
-        completed: Boolean(done[exercise.id]),
+        completed: Boolean(finalDone[exercise.id]),
         order_index: index,
       };
     });
@@ -478,8 +479,9 @@ export default function WorkoutSessionScreen() {
     }
 
     await clearActiveWorkoutSession().catch(() => {});
+    setDone(finalDone);
     setSaving(false);
-    setFinished({ duration, calories, loadKg });
+    setFinished({ duration, calories, loadKg, completedCount: finalCompletedCount });
   }
 
   async function handleShareResult() {
@@ -493,7 +495,7 @@ export default function WorkoutSessionScreen() {
       `Calorias: ${finished.calories} kcal`,
       finished.loadKg > 0 ? `Carga total: ${load} kg` : null,
       `Tempo: ${formatDuration(finished.duration)}`,
-      `${completedCount}/${exercises.length} exercícios concluídos`,
+      `${finished.completedCount}/${exercises.length} exercícios concluídos`,
     ]
       .filter((line): line is string => line !== null)
       .join('\n');
@@ -546,7 +548,7 @@ export default function WorkoutSessionScreen() {
   }
 
   if (finished !== null) {
-    const completion = exercises.length ? completedCount / exercises.length : 0;
+    const completion = exercises.length ? finished.completedCount / exercises.length : 0;
     const load = Math.round(finished.loadKg).toLocaleString('pt-BR');
 
     return (
@@ -559,7 +561,7 @@ export default function WorkoutSessionScreen() {
           <Text style={styles.finishTime}>{workout.name}</Text>
           <ProgressBar value={completion} color="#FFFFFF" style={styles.finishProgress} />
           <Text style={styles.finishMeta}>
-            {completedCount} de {exercises.length} exercícios marcados
+            {finished.completedCount} de {exercises.length} exercícios marcados
           </Text>
         </Hero>
 
@@ -654,14 +656,6 @@ export default function WorkoutSessionScreen() {
             style={styles.headerIconButton}>
             <Ionicons name="ellipsis-horizontal" size={22} color={theme.text} />
           </Pressable>
-          <Pressable
-            onPress={finishWorkout}
-            disabled={saving}
-            accessibilityRole="button"
-            accessibilityLabel="Finalizar treino"
-            style={[styles.headerCheck, { backgroundColor: theme.primarySoft }]}>
-            <Ionicons name="checkmark" size={18} color={Brand.primary} />
-          </Pressable>
         </View>
 
         {menuOpen ? (
@@ -751,6 +745,7 @@ export default function WorkoutSessionScreen() {
                   : formatDuration(restSeconds);
               const note =
                 exercise.notes || exerciseInstructions(exercise) || 'Sem observações para este exercício.';
+              const isFinalCard = index === exercises.length - 1;
 
               return (
                 <Card
@@ -886,13 +881,17 @@ export default function WorkoutSessionScreen() {
                       <Ionicons name="trending-up-outline" size={20} color={Brand.primary} />
                     </Pressable>
                     <Button
-                      title={done[exercise.id] ? 'Concluído' : 'Finalizar'}
-                      variant={done[exercise.id] ? 'secondary' : 'primary'}
-                      disabled={done[exercise.id]}
-                      onPress={() => {
-                        goToExercise(index);
-                        handleToggleDone(exercise);
-                      }}
+                      title={isFinalCard ? 'Finalizar treino' : done[exercise.id] ? 'Concluído' : 'Finalizar'}
+                      variant={isFinalCard || !done[exercise.id] ? 'primary' : 'secondary'}
+                      disabled={isFinalCard ? saving : done[exercise.id]}
+                      onPress={
+                        isFinalCard
+                          ? () => void finishWorkout(exercise.id)
+                          : () => {
+                              goToExercise(index);
+                              handleToggleDone(exercise);
+                            }
+                      }
                       style={styles.cardFinishButton}
                     />
                   </View>
@@ -922,27 +921,6 @@ export default function WorkoutSessionScreen() {
             ))}
           </View>
 
-          {isLastExercise ? (
-            <View style={[styles.finishFooter, { borderColor: theme.border }]}>
-              <View style={styles.finishFooterCopy}>
-                <Text style={[styles.finishFooterTitle, { color: theme.text }]}>
-                  {allDone ? 'Todos os exercícios concluídos' : `${completedCount} de ${exercises.length} concluídos`}
-                </Text>
-                <Text style={[styles.finishFooterHint, { color: theme.textSecondary }]}>
-                  {allDone
-                    ? 'Registre sua sessão e veja o resultado.'
-                    : 'Você pode finalizar mesmo sem marcar todos.'}
-                </Text>
-              </View>
-              <Button
-                title={saving ? 'Salvando...' : 'Finalizar treino'}
-                onPress={finishWorkout}
-                disabled={saving}
-                variant={allDone ? 'primary' : 'secondary'}
-                style={styles.finishFooterButton}
-              />
-            </View>
-          ) : null}
           </ScrollView>
         </>
       ) : (
@@ -1188,32 +1166,6 @@ const styles = StyleSheet.create({
   exitHeaderText: {
     fontSize: 13,
     fontWeight: '800',
-  },
-  finishFooter: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: Spacing.two,
-    padding: Spacing.two,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-  },
-  finishFooterCopy: {
-    flex: 1,
-    minWidth: 160,
-    gap: 2,
-  },
-  finishFooterTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  finishFooterHint: {
-    fontSize: 11,
-  },
-  finishFooterButton: {
-    minWidth: 180,
-    minHeight: 44,
   },
   sessionBody: {
     flex: 1,
@@ -1524,13 +1476,6 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  headerCheck: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerMenu: {
     position: 'absolute',
