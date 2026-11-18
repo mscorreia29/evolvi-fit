@@ -9,6 +9,7 @@ const mealSystemPrompt = [
   'Responda APENAS com JSON no formato: {"title":"Plano alimentar personalizado","notes":"Orientações gerais","meals":[{"name":"Café da manhã","time":"07:30","notes":"Escolha 1 opção desta refeição.","items":[{"name":"Ovos mexidos com pão integral e mamão","quantity":"1 porção","calories":320}]}]}.',
   'Cada item de "items" deve ser uma OPÇÃO COMPLETA de refeição ou prato, com nome que descreva a combinação. Nunca liste alimentos soltos como opções separadas.',
   'Gere exatamente 5 refeições, cada uma com exatamente 6 opções completas diferentes e intercambiáveis. As calorias devem ser da opção inteira.',
+  'Use obrigatoriamente os alimentos que a pessoa mais gosta e adapte as opções à rotina alimentar informada na ficha.',
   'Em todas as refeições, preencha notes exatamente com "Escolha 1 opção desta refeição."',
   'Respeite objetivo, restrições, lesões, idade, peso, altura e preferências informadas.',
   'Não prescreva medicamentos, suplementos obrigatórios ou dietas radicais. Em caso de dúvida, priorize alimentos naturais e oriente procurar um profissional presencial.',
@@ -30,6 +31,8 @@ type Profile = {
   ai_meal_last_generated_at: string | null;
   ai_meal_generation_count: number;
   ai_meal_regeneration_unlocked: boolean;
+  ai_meal_favorite_foods: string | null;
+  ai_meal_routine: string | null;
 };
 
 type MealItem = {
@@ -243,6 +246,11 @@ Deno.serve(async (req) => {
       return json({ error: 'Sessão inválida.' }, 401);
     }
 
+    const payload = await req.json().catch(() => ({}));
+    const favoriteFoods = String(payload?.favorite_foods ?? '').trim().slice(0, 1000);
+    const mealRoutine = String(payload?.meal_routine ?? '').trim().slice(0, 1000);
+    const hasNewPreferences = Boolean(favoriteFoods || mealRoutine);
+
     const settingsRows = (await rest('ai_settings?id=eq.1&select=*')) as Settings[];
     const settings = settingsRows?.[0];
     if (!settings?.enabled) {
@@ -250,7 +258,7 @@ Deno.serve(async (req) => {
     }
 
     const profileRows = (await rest(
-      `profiles?id=eq.${encodeURIComponent(user.id)}&select=is_autonomous,full_name,ai_meal_last_generated_at,ai_meal_generation_count,ai_meal_regeneration_unlocked`,
+      `profiles?id=eq.${encodeURIComponent(user.id)}&select=is_autonomous,full_name,ai_meal_last_generated_at,ai_meal_generation_count,ai_meal_regeneration_unlocked,ai_meal_favorite_foods,ai_meal_routine`,
     )) as Profile[];
     const profile = profileRows?.[0];
     if (!profile?.is_autonomous) {
@@ -264,6 +272,7 @@ Deno.serve(async (req) => {
     const withinInterval = lastGenerated > 0 && Date.now() - lastGenerated < intervalMs;
     if (
       withinInterval &&
+      !hasNewPreferences &&
       !profile.ai_meal_regeneration_unlocked &&
       !settings.allow_manual_regeneration
     ) {
@@ -277,7 +286,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const payload = await req.json().catch(() => ({}));
     const [anamnesisRows, assessmentRows] = await Promise.all([
       rest(
         `anamnesis?student_id=eq.${encodeURIComponent(user.id)}&select=data,created_at&order=created_at.desc&limit=1`,
@@ -300,6 +308,9 @@ Deno.serve(async (req) => {
       weight_kg: assessment.weight_kg ?? anamnesis.weight_kg ?? null,
       height_cm: assessment.height_cm ?? anamnesis.height_cm ?? null,
       location: anamnesis.location ?? null,
+      favorite_foods:
+        favoriteFoods || profile.ai_meal_favorite_foods || anamnesis.favorite_foods || null,
+      meal_routine: mealRoutine || profile.ai_meal_routine || anamnesis.meal_routine || null,
       notes: String(payload?.notes ?? payload?.preferences ?? anamnesis.notes ?? '').slice(0, 500),
     };
 
@@ -354,6 +365,8 @@ Deno.serve(async (req) => {
         ai_meal_last_generated_at: now,
         ai_meal_generation_count: (profile.ai_meal_generation_count ?? 0) + 1,
         ai_meal_regeneration_unlocked: false,
+        ...(favoriteFoods ? { ai_meal_favorite_foods: favoriteFoods } : {}),
+        ...(mealRoutine ? { ai_meal_routine: mealRoutine } : {}),
       }),
     });
 

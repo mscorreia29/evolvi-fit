@@ -4,7 +4,9 @@ alter table public.meal_plans
 alter table public.profiles
   add column if not exists ai_meal_last_generated_at timestamptz,
   add column if not exists ai_meal_generation_count integer not null default 0,
-  add column if not exists ai_meal_regeneration_unlocked boolean not null default false;
+  add column if not exists ai_meal_regeneration_unlocked boolean not null default false,
+  add column if not exists ai_meal_favorite_foods text,
+  add column if not exists ai_meal_routine text;
 
 drop policy if exists meal_plans_insert_self_autonomous on public.meal_plans;
 create policy meal_plans_insert_self_autonomous on public.meal_plans

@@ -41,6 +41,8 @@ export type Profile = {
   payment_notes: string | null;
   xp: number;
   notes: string | null;
+  ai_meal_favorite_foods?: string | null;
+  ai_meal_routine?: string | null;
   cover_url: string | null;
   created_at: string;
 };

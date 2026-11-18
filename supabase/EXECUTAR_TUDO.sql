@@ -373,7 +373,9 @@ create table if not exists public.meal_plans (
   student_id uuid not null references public.profiles(id) on delete cascade,
   title text not null default 'Plano alimentar',
   notes text,
+  ai_generated boolean not null default false,
   meals jsonb not null default '[]'::jsonb,
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (coach_id, student_id)
@@ -381,7 +383,11 @@ create table if not exists public.meal_plans (
 
 create index if not exists meal_plans_student_idx on public.meal_plans(student_id);
 
+alter table public.meal_plans
+  add column if not exists ai_generated boolean not null default false;
+
 alter table public.meal_plans enable row level security;
+
 
 drop policy if exists meal_plans_select on public.meal_plans;
 create policy meal_plans_select on public.meal_plans
@@ -1695,7 +1701,12 @@ alter table public.profiles
   add column if not exists is_autonomous boolean not null default false,
   add column if not exists ai_last_generated_at timestamptz,
   add column if not exists ai_generation_count integer not null default 0,
-  add column if not exists ai_regeneration_unlocked boolean not null default false;
+  add column if not exists ai_regeneration_unlocked boolean not null default false,
+  add column if not exists ai_meal_last_generated_at timestamptz,
+  add column if not exists ai_meal_generation_count integer not null default 0,
+  add column if not exists ai_meal_regeneration_unlocked boolean not null default false,
+  add column if not exists ai_meal_favorite_foods text,
+  add column if not exists ai_meal_routine text;
 
 create index if not exists profiles_autonomous_idx on public.profiles(is_autonomous) where is_autonomous;
 

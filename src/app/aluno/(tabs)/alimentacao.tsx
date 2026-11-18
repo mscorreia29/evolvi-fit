@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Loading } from '@/components/ui/loading';
 import { PhotoHero } from '@/components/ui/photo-hero';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeader } from '@/components/ui/section-header';
+import { TextField } from '@/components/ui/text-field';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -32,6 +33,10 @@ export default function StudentNutritionScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [favoriteFoods, setFavoriteFoods] = useState(profile?.ai_meal_favorite_foods ?? '');
+  const [mealRoutine, setMealRoutine] = useState(profile?.ai_meal_routine ?? '');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -52,35 +57,57 @@ export default function StudentNutritionScreen() {
     setRefreshing(false);
   }
 
-  async function generatePlan() {
+  async function generatePlan(preferences: { favoriteFoods: string; mealRoutine: string }) {
     setGenerating(true);
     setNotice(null);
     setError(null);
     try {
-      const result = await generateAiMealPlan();
+      const result = await generateAiMealPlan(preferences);
       setNotice(`${result.title} criado com ${result.mealsCount} refeições.`);
       await load();
+      return true;
     } catch (generateError) {
       setError(
         generateError instanceof Error
           ? generateError.message
           : 'Não foi possível gerar seu plano alimentar.',
       );
+      return false;
     } finally {
       setGenerating(false);
     }
   }
 
+  function openForm() {
+    setFavoriteFoods(profile?.ai_meal_favorite_foods ?? '');
+    setMealRoutine(profile?.ai_meal_routine ?? '');
+    setFormError(null);
+    setShowForm(true);
+  }
+
   function handleGeneratePlan() {
     if (!plan) {
-      void generatePlan();
+      openForm();
       return;
     }
 
     Alert.alert('Gerar novo plano?', 'O plano atual será substituído pelo novo plano da IA.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Gerar', onPress: () => void generatePlan() },
+      { text: 'Preencher ficha', onPress: openForm },
     ]);
+  }
+
+  async function handleSubmitForm() {
+    const foods = favoriteFoods.trim();
+    const routine = mealRoutine.trim();
+    if (foods.length < 5 || routine.length < 5) {
+      setFormError('Conte um pouco mais sobre seus alimentos favoritos e sua rotina.');
+      return;
+    }
+
+    setFormError(null);
+    const success = await generatePlan({ favoriteFoods: foods, mealRoutine: routine });
+    if (success) setShowForm(false);
   }
 
   if (loading) return <Loading label="Carregando plano alimentar..." />;
@@ -88,7 +115,8 @@ export default function StudentNutritionScreen() {
   const totalCalories = mealPlanCalories(plan);
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <>
+      <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <PhotoHero source={Images.workout} height={240} imagePosition="top" glowColor={Brand.accent}>
         <View style={styles.kicker}>
           <Ionicons name="restaurant" size={12} color="#FFFFFF" />
@@ -118,7 +146,7 @@ export default function StudentNutritionScreen() {
         <Card style={[styles.aiCard, { borderColor: Brand.primary }]}>
           <SectionHeader
             title="Plano alimentar com IA"
-            subtitle="Crie um plano alimentar personalizado a partir da sua anamnese."
+            subtitle="Preencha a ficha com seus gostos e rotina para a IA montar o plano."
           />
           <Button
             title={plan ? 'Gerar novo plano com IA' : 'Criar plano com IA'}
@@ -171,7 +199,69 @@ export default function StudentNutritionScreen() {
           ))}
         </>
       )}
-    </Screen>
+      </Screen>
+
+      <Modal
+        visible={showForm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowForm(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowForm(false)}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+            onPress={() => undefined}>
+            <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+              <View style={styles.modalHeader}>
+                <Ionicons name="restaurant-outline" size={20} color={Brand.primary} />
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Ficha alimentar</Text>
+              </View>
+              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+                Conte o que você mais gosta de comer e como é sua rotina. A IA vai montar as
+                refeições a partir disso.
+              </Text>
+              <TextField
+                label="O que você mais gosta de comer?"
+                value={favoriteFoods}
+                onChangeText={setFavoriteFoods}
+                placeholder="Ex.: arroz com feijão, frango grelhado, iogurte com frutas..."
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              <TextField
+                label="Como é sua rotina alimentar?"
+                value={mealRoutine}
+                onChangeText={setMealRoutine}
+                placeholder="Ex.: 5 refeições por dia, almoço fora de casa, jantar leve..."
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              {formError ? (
+                <Text style={[styles.modalError, { color: Brand.danger }]}>{formError}</Text>
+              ) : null}
+              <View style={styles.modalActions}>
+                <Button
+                  title="Cancelar"
+                  variant="secondary"
+                  onPress={() => setShowForm(false)}
+                  style={styles.modalButton}
+                />
+                <Button
+                  title="Montar plano"
+                  onPress={() => void handleSubmitForm()}
+                  loading={generating}
+                  style={styles.modalButton}
+                />
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -392,5 +482,50 @@ const styles = StyleSheet.create({
   itemCalories: {
     fontSize: 12,
     fontWeight: '800',
+  },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.three,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 460,
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  modalContent: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  modalError: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  modalButton: {
+    flex: 1,
   },
 });

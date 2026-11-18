@@ -157,7 +157,11 @@ export async function generateAiWorkout(payload: AutonomousAnamnesis) {
   };
 }
 
-export async function generateAiMealPlan(input?: { notes?: string }) {
+export async function generateAiMealPlan(input?: {
+  favoriteFoods?: string;
+  mealRoutine?: string;
+  notes?: string;
+}) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
   if (!token) {
@@ -165,7 +169,11 @@ export async function generateAiMealPlan(input?: { notes?: string }) {
   }
 
   const { data, error } = await supabase.functions.invoke('generate-ai-meal-plan', {
-    body: { notes: input?.notes ?? '' },
+    body: {
+      favorite_foods: input?.favoriteFoods?.trim() ?? '',
+      meal_routine: input?.mealRoutine?.trim() ?? '',
+      notes: input?.notes ?? '',
+    },
     headers: {
       Authorization: `Bearer ${token}`,
     },
