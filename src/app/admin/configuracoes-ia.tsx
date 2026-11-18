@@ -211,7 +211,7 @@ export default function AdminIaScreen() {
           label="Modelo (opcional)"
           value={model}
           onChangeText={setModel}
-          placeholder={provider === 'gemini' ? 'gemini-3.1-flash-lite' : 'gpt-4o-mini'}
+          placeholder={provider === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-4o-mini'}
           autoCapitalize="none"
         />
         <TextField

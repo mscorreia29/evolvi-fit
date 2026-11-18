@@ -87,7 +87,7 @@ Q: Erro "violates row-level security"? A: Rode fix_rls_comunicacao.sql no Supaba
 Q: Dados não aparecem? A: Verifique se o SQL de upgrade foi executado no Supabase.`;
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },

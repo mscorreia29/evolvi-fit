@@ -63,6 +63,19 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function isRetryableGeminiError(status: number, message: string) {
+  const text = message.toLowerCase();
+  return (
+    status === 404 ||
+    status === 429 ||
+    status === 500 ||
+    status === 503 ||
+    /high demand|overload|capacity|temporarily unavailable|rate limit|resource exhausted|unavailable/i.test(
+      text,
+    )
+  );
+}
+
 async function rest(path: string, init: RequestInit = {}) {
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...init,
@@ -223,8 +236,15 @@ async function callProvider(settings: Settings, prompt: string) {
     return payload;
   }
 
-  const configuredModel = settings.model?.trim() || 'gemini-3.1-flash-lite';
-  const models = [...new Set([configuredModel, 'gemini-3.1-flash-lite'])];
+  const configuredModel = settings.model?.trim() || 'gemini-3.5-flash-lite';
+  const models = [
+    ...new Set([
+      configuredModel,
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
+      'gemini-2.5-flash-lite',
+    ]),
+  ];
   let lastError: Error | null = null;
 
   for (const model of models) {
@@ -249,11 +269,12 @@ async function callProvider(settings: Settings, prompt: string) {
     const payload = await response.json().catch(() => ({}));
     if (response.ok) return payload;
 
-    lastError = new Error(payload?.error?.message ?? `Gemini ${response.status}`);
-    if (response.status !== 404 && response.status !== 503) throw lastError;
+    const message = String(payload?.error?.message ?? `Gemini ${response.status}`);
+    lastError = new Error(message);
+    if (!isRetryableGeminiError(response.status, message)) throw lastError;
   }
 
-  throw lastError ?? new Error('Gemini indisponível.');
+  throw new Error('A IA está temporariamente indisponível. Tente novamente em instantes.');
 }
 
 Deno.serve(async (req) => {
