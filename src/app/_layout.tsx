@@ -1,12 +1,13 @@
-import { DarkTheme, Stack, ThemeProvider, router } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider, router, usePathname, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 
 import { Brand, Colors } from '@/constants/theme';
 import '@/lib/notifications';
-import { AuthProvider } from '@/providers/auth-provider';
+import { loadActiveWorkoutSession } from '@/lib/workouts';
+import { AuthProvider, useAuth } from '@/providers/auth-provider';
 
 const darkNavigation = {
   ...DarkTheme,
@@ -49,12 +50,44 @@ function useNotificationObserver() {
   }, []);
 }
 
+function WorkoutResumeGuard() {
+  const { loading, profile } = useAuth();
+  const pathname = usePathname();
+  const resumeRouter = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resume() {
+      if (loading || !profile) return;
+      const draft = await loadActiveWorkoutSession();
+      if (cancelled || !draft || draft.studentId !== profile.id) return;
+      if (pathname.startsWith(`/aluno/treino/${draft.workoutId}`)) return;
+      resumeRouter.replace(`/aluno/treino/${draft.workoutId}` as never);
+    }
+
+    void resume();
+
+    const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') void resume();
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, [loading, profile, pathname, resumeRouter]);
+
+  return null;
+}
+
 export default function RootLayout() {
   useNotificationObserver();
 
   return (
     <AuthProvider>
       <ThemeProvider value={darkNavigation}>
+        <WorkoutResumeGuard />
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />

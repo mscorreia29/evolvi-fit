@@ -1,4 +1,4 @@
-const CACHE_NAME = 'evolvifit-v23';
+const CACHE_NAME = 'evolvifit-v24';
 const APP_SHELL = ['/', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -39,11 +39,17 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request.url, copy));
+          }
           return response;
         })
-        .catch(async () => (await caches.match('/')) || (await caches.match('/index.html')))
+        .catch(async () =>
+          (await caches.match(request.url)) ||
+          (await caches.match('/')) ||
+          (await caches.match('/index.html'))
+        )
     );
     return;
   }

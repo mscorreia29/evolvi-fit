@@ -391,8 +391,8 @@ export default function WorkoutSessionScreen() {
     setModal(null);
   }
 
-  function leaveWorkout() {
-    void clearActiveWorkoutSession().catch(() => {});
+  async function leaveWorkout() {
+    await clearActiveWorkoutSession().catch(() => {});
     if (router.canGoBack()) {
       router.back();
     } else {
@@ -405,13 +405,13 @@ export default function WorkoutSessionScreen() {
     if (Platform.OS === 'web') {
       const browser = (globalThis as { window?: { confirm?: (text: string) => boolean } }).window;
       if (browser?.confirm && !browser.confirm(message)) return;
-      leaveWorkout();
+      void leaveWorkout();
       return;
     }
 
     Alert.alert('Sair do treino?', 'O progresso desta sessão será encerrado.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: leaveWorkout },
+      { text: 'Sair', style: 'destructive', onPress: () => void leaveWorkout() },
     ]);
   }
 
