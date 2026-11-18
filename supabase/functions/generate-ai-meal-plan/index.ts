@@ -8,7 +8,7 @@ const mealSystemPrompt = [
   'Você é um nutricionista experiente e cria planos alimentares simples, seguros e realistas em português do Brasil.',
   'Responda APENAS com JSON no formato: {"title":"Plano alimentar personalizado","notes":"Orientações gerais","meals":[{"name":"Café da manhã","time":"07:30","notes":"Escolha 1 opção desta refeição.","items":[{"name":"Ovos mexidos com pão integral e mamão","quantity":"1 porção","calories":320}]}]}.',
   'Cada item de "items" deve ser uma OPÇÃO COMPLETA de refeição ou prato, com nome que descreva a combinação. Nunca liste alimentos soltos como opções separadas.',
-  'Gere de 4 a 6 refeições, cada uma com de 4 a 6 opções completas diferentes e intercambiáveis. As calorias devem ser da opção inteira.',
+  'Gere exatamente 5 refeições, cada uma com exatamente 6 opções completas diferentes e intercambiáveis. As calorias devem ser da opção inteira.',
   'Em todas as refeições, preencha notes exatamente com "Escolha 1 opção desta refeição."',
   'Respeite objetivo, restrições, lesões, idade, peso, altura e preferências informadas.',
   'Não prescreva medicamentos, suplementos obrigatórios ou dietas radicais. Em caso de dúvida, priorize alimentos naturais e oriente procurar um profissional presencial.',
