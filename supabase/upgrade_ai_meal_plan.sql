@@ -10,29 +10,59 @@ alter table public.profiles
   add column if not exists ai_meal_preferences jsonb not null default '{}'::jsonb;
 
 drop policy if exists meal_plans_insert_self_autonomous on public.meal_plans;
-create policy meal_plans_insert_self_autonomous on public.meal_plans
+drop policy if exists meal_plans_insert_self_ai on public.meal_plans;
+create policy meal_plans_insert_self_ai on public.meal_plans
 for insert to authenticated
 with check (
-  coach_id = auth.uid()
-  and student_id = auth.uid()
-  and exists (
-    select 1
-    from public.profiles
-    where id = auth.uid() and is_autonomous = true
+  student_id = auth.uid()
+  and (
+    (
+      coach_id = auth.uid()
+      and exists (
+        select 1
+        from public.profiles
+        where id = auth.uid() and is_autonomous = true
+      )
+    )
+    or exists (
+      select 1
+      from public.coach_students
+      where student_id = auth.uid() and coach_id = meal_plans.coach_id
+    )
   )
 );
 
 drop policy if exists meal_plans_update_self_autonomous on public.meal_plans;
-create policy meal_plans_update_self_autonomous on public.meal_plans
+drop policy if exists meal_plans_update_self_ai on public.meal_plans;
+create policy meal_plans_update_self_ai on public.meal_plans
 for update to authenticated
-using (coach_id = auth.uid() and student_id = auth.uid())
+using (
+  student_id = auth.uid()
+  and (
+    coach_id = auth.uid()
+    or exists (
+      select 1
+      from public.coach_students
+      where student_id = auth.uid() and coach_id = meal_plans.coach_id
+    )
+  )
+)
 with check (
-  coach_id = auth.uid()
-  and student_id = auth.uid()
-  and exists (
-    select 1
-    from public.profiles
-    where id = auth.uid() and is_autonomous = true
+  student_id = auth.uid()
+  and (
+    (
+      coach_id = auth.uid()
+      and exists (
+        select 1
+        from public.profiles
+        where id = auth.uid() and is_autonomous = true
+      )
+    )
+    or exists (
+      select 1
+      from public.coach_students
+      where student_id = auth.uid() and coach_id = meal_plans.coach_id
+    )
   )
 );
 
@@ -62,7 +92,7 @@ begin
 
   update public.profiles
   set ai_meal_regeneration_unlocked = true
-  where id = p_user_id and is_autonomous;
+  where id = p_user_id and role = 'aluno';
 end;
 $$;
 

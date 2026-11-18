@@ -76,9 +76,7 @@ function getSavedMealInput(profile: Profile | null): MealPlanInput | null {
 export default function StudentNutritionScreen() {
   const theme = useTheme();
   const { profile, refreshProfile } = useAuth();
-  const isAutonomous = Boolean(
-    (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
-  );
+  const isStudent = profile?.role === 'aluno';
   const [plan, setPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -254,7 +252,7 @@ export default function StudentNutritionScreen() {
         ) : null}
       </PhotoHero>
 
-      {isAutonomous ? (
+      {isStudent ? (
         <Card style={[styles.aiCard, { borderColor: Brand.primary }]}>
           <SectionHeader
             title="Plano alimentar com IA"
@@ -281,11 +279,7 @@ export default function StudentNutritionScreen() {
         <EmptyState
           icon="restaurant-outline"
           title="Plano alimentar em preparação"
-          message={
-            isAutonomous
-              ? 'Toque em “Criar plano com IA” para gerar seu plano alimentar agora.'
-              : 'Seu personal ainda não publicou um plano. Quando publicar, ele aparece aqui automaticamente.'
-          }
+          message="Toque em “Criar plano com IA” para gerar seu plano alimentar agora."
         />
       ) : (
         <>

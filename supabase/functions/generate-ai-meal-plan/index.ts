@@ -26,6 +26,7 @@ type Settings = {
 };
 
 type Profile = {
+  role: string;
   is_autonomous: boolean;
   full_name: string | null;
   ai_meal_last_generated_at: string | null;
@@ -281,12 +282,19 @@ Deno.serve(async (req) => {
     }
 
     const profileRows = (await rest(
-      `profiles?id=eq.${encodeURIComponent(user.id)}&select=is_autonomous,full_name,ai_meal_last_generated_at,ai_meal_generation_count,ai_meal_regeneration_unlocked,ai_meal_favorite_foods,ai_meal_routine,ai_meal_preferences`,
+      `profiles?id=eq.${encodeURIComponent(user.id)}&select=role,is_autonomous,full_name,ai_meal_last_generated_at,ai_meal_generation_count,ai_meal_regeneration_unlocked,ai_meal_favorite_foods,ai_meal_routine,ai_meal_preferences`,
     )) as Profile[];
     const profile = profileRows?.[0];
-    if (!profile?.is_autonomous) {
-      return json({ error: 'Este recurso é exclusivo para alunos autônomos.' }, 403);
+    if (profile?.role !== 'aluno') {
+      return json({ error: 'Este recurso é exclusivo para alunos.' }, 403);
     }
+
+    const coachRows = profile.is_autonomous
+      ? []
+      : ((await rest(
+          `coach_students?student_id=eq.${encodeURIComponent(user.id)}&select=coach_id&limit=1`,
+        )) as { coach_id: string }[]);
+    const coachId = profile.is_autonomous ? user.id : coachRows?.[0]?.coach_id || user.id;
 
     const lastGenerated = profile.ai_meal_last_generated_at
       ? new Date(profile.ai_meal_last_generated_at).getTime()
@@ -348,13 +356,14 @@ Deno.serve(async (req) => {
     const aiPayload = await callProvider(settings, prompt);
     const plan = parsePlan(aiPayload);
     const now = new Date().toISOString();
-    const existing = (await rest(
-      `meal_plans?coach_id=eq.${encodeURIComponent(user.id)}&student_id=eq.${encodeURIComponent(user.id)}&select=id`,
-    )) as { id: string }[];
+    const existingRows = (await rest(
+      `meal_plans?student_id=eq.${encodeURIComponent(user.id)}&select=id,coach_id&order=updated_at.desc`,
+    )) as { id: string; coach_id: string }[];
+    const existing = existingRows?.find((row) => row.coach_id === coachId) ?? existingRows?.[0];
 
     let mealPlanId: string | undefined;
-    if (existing?.[0]?.id) {
-      const updated = (await rest(`meal_plans?id=eq.${encodeURIComponent(existing[0].id)}`, {
+    if (existing?.id) {
+      const updated = (await rest(`meal_plans?id=eq.${encodeURIComponent(existing.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
           title: plan.title,
@@ -364,12 +373,12 @@ Deno.serve(async (req) => {
           updated_at: now,
         }),
       })) as { id: string }[];
-      mealPlanId = updated?.[0]?.id ?? existing[0].id;
+      mealPlanId = updated?.[0]?.id ?? existing.id;
     } else {
       const created = (await rest('meal_plans', {
         method: 'POST',
         body: JSON.stringify({
-          coach_id: user.id,
+          coach_id: coachId,
           student_id: user.id,
           title: plan.title,
           notes: plan.notes,
