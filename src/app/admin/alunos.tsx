@@ -25,6 +25,7 @@ export default function AdminAlunos() {
 
   const [alunos, setAlunos] = useState<Profile[]>([]);
   const [coaches, setCoaches] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<'all' | 'linked' | 'autonomous'>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -74,6 +75,11 @@ export default function AdminAlunos() {
 
   if (loading) return <Loading label="Carregando alunos..." />;
 
+  const autonomousCount = alunos.filter((a) => a.is_autonomous).length;
+  const filtered = alunos.filter((a) =>
+    filter === 'all' ? true : filter === 'autonomous' ? Boolean(a.is_autonomous) : !a.is_autonomous,
+  );
+
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <PhotoHero source={Images.student} height={180} imagePosition="top" glowColor={Brand.primary}>
@@ -83,15 +89,49 @@ export default function AdminAlunos() {
           </Pressable>
           <View style={styles.heroTexts}>
             <Text style={styles.heroTitle}>Alunos</Text>
-            <Text style={styles.heroSub}>{alunos.length} cadastrado(s)</Text>
+            <Text style={styles.heroSub}>
+              {alunos.length} aluno(s) • {autonomousCount} autônomo(s)
+            </Text>
           </View>
         </View>
       </PhotoHero>
 
-      {alunos.length === 0 ? (
-        <EmptyState icon="school-outline" title="Nenhum aluno" message="Alunos são criados pelos personais." />
+      <View style={styles.filterRow}>
+        {([
+          ['all', 'Todos'],
+          ['linked', 'Vinculados'],
+          ['autonomous', 'Autônomos'],
+        ] as const).map(([value, label]) => (
+          <Pressable
+            key={value}
+            onPress={() => setFilter(value)}
+            style={[
+              styles.filterChip,
+              {
+                backgroundColor: filter === value ? Brand.primary : theme.backgroundElement,
+                borderColor: filter === value ? Brand.primary : theme.border,
+              },
+            ]}>
+            <Text
+              style={{
+                color: filter === value ? '#FFFFFF' : theme.text,
+                fontWeight: '700',
+                fontSize: 12,
+              }}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon="school-outline"
+          title="Nenhum aluno"
+          message="Nenhum cadastro com este filtro."
+        />
       ) : (
-        alunos.map((a) => (
+        filtered.map((a) => (
           <Card key={a.id} style={styles.card}>
             <View style={styles.row}>
               <Avatar name={a.full_name} size={40} />
@@ -102,11 +142,17 @@ export default function AdminAlunos() {
                 <Text style={[styles.email, { color: theme.textSecondary }]} numberOfLines={1}>
                   {a.email}
                 </Text>
-                <Text style={[styles.meta, { color: theme.textSecondary }]}>
-                  Personal: {coaches[a.id] ?? '—'} • {new Date(a.created_at).toLocaleDateString('pt-BR')}
+                <Text style={[styles.meta, { color: theme.textSecondary }]} numberOfLines={2}>
+                  {a.is_autonomous
+                    ? `Cadastro IA • treinos ${a.ai_generation_count ?? 0}x • plano ${a.ai_meal_generation_count ?? 0}x`
+                    : `Personal: ${coaches[a.id] ?? '—'}`}{' '}
+                  • {new Date(a.created_at).toLocaleDateString('pt-BR')}
                 </Text>
               </View>
-              <Badge label="Aluno" tone="muted" />
+              <Badge
+                label={a.is_autonomous ? 'Autônomo' : 'Aluno'}
+                tone={a.is_autonomous ? 'primary' : 'muted'}
+              />
             </View>
           </Card>
         ))
@@ -141,6 +187,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    borderWidth: 1,
   },
   card: {
     gap: Spacing.two,

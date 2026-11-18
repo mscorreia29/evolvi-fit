@@ -1,7 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +21,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
 import { PhotoHero } from '@/components/ui/photo-hero';
 import { Screen } from '@/components/ui/screen';
+import { TextField } from '@/components/ui/text-field';
 
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
@@ -20,6 +31,22 @@ import { supabase } from '@/lib/supabase';
 import type { PaymentDue, Profile } from '@/lib/types';
 
 type Row = PaymentDue & { student?: Profile | null };
+type PaymentStatus = PaymentDue['status'];
+type Draft = {
+  description: string;
+  amount: string;
+  due_date: string;
+  status: PaymentStatus;
+  notes: string;
+};
+
+const emptyDraft: Draft = {
+  description: '',
+  amount: '',
+  due_date: new Date().toISOString().slice(0, 10),
+  status: 'pending',
+  notes: '',
+};
 
 export default function AdminPagamentos() {
   const router = useRouter();
@@ -30,6 +57,9 @@ export default function AdminPagamentos() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data: dues, error: duesError } = await supabase
@@ -95,6 +125,97 @@ export default function AdminPagamentos() {
       return;
     }
     await load();
+  }
+
+  function updateDraft<K extends keyof Draft>(key: K, value: Draft[K]) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function openEdit(row: Row) {
+    setEditing(row);
+    setFormError(null);
+    setDraft({
+      description: row.description,
+      amount: row.amount == null ? '' : String(row.amount),
+      due_date: row.due_date,
+      status: row.status,
+      notes: row.notes ?? '',
+    });
+  }
+
+  function closeEdit() {
+    if (actionId) return;
+    setEditing(null);
+    setFormError(null);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    const description = draft.description.trim();
+    const amount = Number(draft.amount.replace(',', '.'));
+    const dueDate = draft.due_date.trim();
+
+    if (!description) {
+      setFormError('Informe a descrição da cobrança.');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFormError('Informe um valor válido maior que zero.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || Number.isNaN(Date.parse(dueDate))) {
+      setFormError('Informe a data de vencimento no formato AAAA-MM-DD.');
+      return;
+    }
+
+    setFormError(null);
+    setActionId(editing.id);
+    const paidAt = draft.status === 'paid' ? editing.paid_at ?? new Date().toISOString() : null;
+    const { error: updateError } = await supabase
+      .from('payment_dues')
+      .update({
+        description,
+        amount,
+        due_date: dueDate,
+        status: draft.status,
+        notes: draft.notes.trim() || null,
+        paid_at: paidAt,
+      })
+      .eq('id', editing.id);
+    setActionId(null);
+    if (updateError) {
+      setFormError(updateError.message);
+      return;
+    }
+    setEditing(null);
+    await load();
+  }
+
+  async function removeRow(row: Row) {
+    setActionId(row.id);
+    const { error: deleteError } = await supabase
+      .from('payment_dues')
+      .delete()
+      .eq('id', row.id);
+    setActionId(null);
+    if (deleteError) {
+      setError(deleteError.message);
+      Alert.alert('Não foi possível excluir', deleteError.message);
+      return;
+    }
+    await load();
+  }
+
+  function confirmDelete(row: Row) {
+    const message = `Excluir a cobrança "${row.description}" de ${row.student?.full_name ?? 'Aluno'}?`;
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(message)) void removeRow(row);
+      return;
+    }
+    Alert.alert('Excluir cobrança', message, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: () => void removeRow(row) },
+    ]);
   }
 
   if (loading) return <Loading label="Carregando pagamentos..." />;
@@ -165,6 +286,11 @@ export default function AdminPagamentos() {
                 {row.amount != null ? (
                   <Text style={[styles.amount, { color: Brand.primary }]}>R$ {Number(row.amount).toFixed(2)}</Text>
                 ) : null}
+                {row.notes ? (
+                  <Text style={[styles.desc, { color: theme.textSecondary }]} numberOfLines={2}>
+                    {row.notes}
+                  </Text>
+                ) : null}
               </View>
               <Badge
                 label={row.status === 'paid' ? 'Pago' : row.status === 'late' ? 'Atrasado' : row.status === 'cancelled' ? 'Cancelado' : 'Pendente'}
@@ -181,17 +307,130 @@ export default function AdminPagamentos() {
                   disabled={actionId !== null}
                 />
                 <Button
-                  title="Cancelar"
+                  title="Cancelar cobrança"
                   variant="secondary"
                   onPress={() => markCancelled(row)}
                   disabled={actionId !== null}
                 />
               </View>
             )}
+            <View style={styles.actions}>
+              <Button
+                title="Editar"
+                variant="secondary"
+                onPress={() => openEdit(row)}
+                disabled={actionId !== null}
+              />
+              <Button
+                title="Excluir"
+                variant="danger"
+                onPress={() => confirmDelete(row)}
+                disabled={actionId !== null}
+              />
+            </View>
             {actionId === row.id ? <ActivityIndicator size="small" color={Brand.primary} /> : null}
           </Card>
         ))
       ) : null}
+
+      <Modal
+        visible={Boolean(editing)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEdit}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={closeEdit}>
+            <Pressable
+              style={[
+                styles.modalCard,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+              onPress={() => undefined}>
+              <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: theme.text }]}>Editar cobrança</Text>
+                  <Pressable onPress={closeEdit} hitSlop={8}>
+                    <Ionicons name="close" size={22} color={theme.textSecondary} />
+                  </Pressable>
+                </View>
+                <Text style={[styles.modalStudent, { color: theme.textSecondary }]}>
+                  {editing?.student?.full_name ?? 'Aluno'} • {editing?.student?.email ?? ''}
+                </Text>
+                <TextField
+                  label="Descrição"
+                  value={draft.description}
+                  onChangeText={(value) => updateDraft('description', value)}
+                  placeholder="Mensalidade"
+                />
+                <TextField
+                  label="Valor (R$)"
+                  value={draft.amount}
+                  onChangeText={(value) => updateDraft('amount', value)}
+                  placeholder="149,90"
+                  keyboardType="decimal-pad"
+                />
+                <TextField
+                  label="Vencimento (AAAA-MM-DD)"
+                  value={draft.due_date}
+                  onChangeText={(value) => updateDraft('due_date', value)}
+                  placeholder="2026-11-20"
+                />
+                <Text style={[styles.sectionLabel, { color: theme.text }]}>Status</Text>
+                <View style={styles.filterRow}>
+                  {([
+                    ['pending', 'Pendente'],
+                    ['paid', 'Pago'],
+                    ['late', 'Atrasado'],
+                    ['cancelled', 'Cancelado'],
+                  ] as const).map(([value, label]) => (
+                    <Pressable
+                      key={value}
+                      onPress={() => updateDraft('status', value)}
+                      style={[
+                        styles.filterChip,
+                        {
+                          backgroundColor: draft.status === value ? Brand.primary : theme.backgroundElement,
+                          borderColor: draft.status === value ? Brand.primary : theme.border,
+                        },
+                      ]}>
+                      <Text
+                        style={{
+                          color: draft.status === value ? '#FFFFFF' : theme.text,
+                          fontWeight: '700',
+                          fontSize: 12,
+                        }}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextField
+                  label="Observações"
+                  value={draft.notes}
+                  onChangeText={(value) => updateDraft('notes', value)}
+                  placeholder="Detalhes opcionais"
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+                {formError ? (
+                  <Text style={[styles.errorText, { color: Brand.danger }]}>{formError}</Text>
+                ) : null}
+                <View style={styles.actions}>
+                  <Button title="Cancelar" variant="secondary" onPress={closeEdit} style={styles.modalButton} />
+                  <Button
+                    title="Salvar alterações"
+                    onPress={() => void saveEdit()}
+                    loading={Boolean(actionId)}
+                    disabled={Boolean(actionId)}
+                    style={styles.modalButton}
+                  />
+                </View>
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -276,5 +515,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.three,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  modalBackdrop: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 460,
+    maxHeight: '90%',
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  modalContent: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  modalStudent: {
+    fontSize: 12,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  modalButton: {
+    flex: 1,
   },
 });

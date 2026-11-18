@@ -41,6 +41,13 @@ export type Profile = {
   payment_notes: string | null;
   xp: number;
   notes: string | null;
+  is_autonomous?: boolean;
+  ai_last_generated_at?: string | null;
+  ai_generation_count?: number;
+  ai_regeneration_unlocked?: boolean;
+  ai_meal_last_generated_at?: string | null;
+  ai_meal_generation_count?: number;
+  ai_meal_regeneration_unlocked?: boolean;
   ai_meal_favorite_foods?: string | null;
   ai_meal_routine?: string | null;
   cover_url: string | null;
