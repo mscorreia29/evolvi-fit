@@ -201,42 +201,36 @@ function parsePlan(payload: any, maxBlocks: number): WorkoutPlan {
   return { name: baseName, blocks };
 }
 
-async function callProvider(settings: Settings, prompt: string) {
-  const providerSecret = settings.provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY';
-  const key =
-    settings.api_key?.trim() ||
-    Deno.env.get('AI_API_KEY')?.trim() ||
-    Deno.env.get(providerSecret)?.trim();
-  if (!key) {
-    throw new Error('Chave de IA não configurada no painel Admin Master ou nas secrets do Supabase.');
+async function callOpenAi(systemPrompt: string, prompt: string, key: string, model: string) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(payload?.error?.message ?? `OpenAI ${response.status}`));
   }
+  return payload;
+}
 
-  if (settings.provider === 'openai') {
-    const model = settings.model?.trim() || 'gpt-4o-mini';
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: settings.prompt_base },
-          { role: 'user', content: prompt },
-        ],
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload?.error?.message ?? `OpenAI ${response.status}`);
-    }
-    return payload;
-  }
-
-  const configuredModel = settings.model?.trim() || 'gemini-3.5-flash-lite';
+async function callGemini(
+  systemPrompt: string,
+  prompt: string,
+  key: string,
+  configuredModel: string,
+) {
   const models = [
     ...new Set([
       configuredModel,
@@ -257,7 +251,7 @@ async function callProvider(settings: Settings, prompt: string) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: settings.prompt_base }] },
+          systemInstruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
@@ -274,7 +268,67 @@ async function callProvider(settings: Settings, prompt: string) {
     if (!isRetryableGeminiError(response.status, message)) throw lastError;
   }
 
-  throw new Error('A IA está temporariamente indisponível. Tente novamente em instantes.');
+  throw lastError ?? new Error('Gemini indisponível.');
+}
+
+async function callProvider(settings: Settings, prompt: string) {
+  const isGemini = settings.provider === 'gemini';
+  const providerSecret = isGemini ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY';
+  const key =
+    settings.api_key?.trim() ||
+    Deno.env.get('AI_API_KEY')?.trim() ||
+    Deno.env.get(providerSecret)?.trim();
+  if (!key) {
+    throw new Error('Chave de IA não configurada no painel Admin Master ou nas secrets do Supabase.');
+  }
+
+  if (isGemini) {
+    try {
+      return await callGemini(
+        settings.prompt_base,
+        prompt,
+        key,
+        settings.model?.trim() || 'gemini-3.5-flash-lite',
+      );
+    } catch (geminiError) {
+      const openAiKey = Deno.env.get('OPENAI_API_KEY')?.trim();
+      if (openAiKey) {
+        try {
+          return await callOpenAi(settings.prompt_base, prompt, openAiKey, 'gpt-4o-mini');
+        } catch (openAiError) {
+          throw new Error(
+            `Gemini: ${geminiError instanceof Error ? geminiError.message : 'falhou'}. OpenAI: ${
+              openAiError instanceof Error ? openAiError.message : 'falhou'
+            }.`,
+          );
+        }
+      }
+      throw geminiError;
+    }
+  }
+
+  try {
+    return await callOpenAi(
+      settings.prompt_base,
+      prompt,
+      key,
+      settings.model?.trim() || 'gpt-4o-mini',
+    );
+  } catch (openAiError) {
+    const geminiKey = Deno.env.get('GEMINI_API_KEY')?.trim();
+    if (geminiKey) {
+      try {
+        return await callGemini(settings.prompt_base, prompt, geminiKey, 'gemini-3.5-flash-lite');
+      } catch (geminiError) {
+        throw new Error(
+          `OpenAI: ${openAiError instanceof Error ? openAiError.message : 'falhou'}. Gemini: ${
+            geminiError instanceof Error ? geminiError.message : 'falhou'
+          }.`,
+        );
+      }
+    }
+    throw openAiError;
+  }
 }
 
 Deno.serve(async (req) => {
