@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Image,
   Modal,
   Platform,
@@ -35,7 +37,14 @@ import { getExerciseCategory, isCardioCategory } from '@/lib/exercises';
 import { formatDuration } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { WorkoutExercise, WorkoutWithDays } from '@/lib/types';
+import {
+  clearActiveWorkoutSession,
+  loadActiveWorkoutSession,
+  saveActiveWorkoutSession,
+} from '@/lib/workouts';
 import { useAuth } from '@/providers/auth-provider';
+
+const WORKOUT_KEEP_AWAKE_TAG = 'evolvifit-workout';
 
 type LogValues = {
   sets: string;
@@ -147,8 +156,9 @@ export default function WorkoutSessionScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [startedAt] = useState(() => Date.now());
+  const [startedAt, setStartedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
+  const [hydrated, setHydrated] = useState(false);
   const [done, setDone] = useState<Record<string, boolean>>({});
   const [logs, setLogs] = useState<Record<string, LogValues>>({});
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
@@ -170,12 +180,21 @@ export default function WorkoutSessionScreen() {
   }, []);
 
   useEffect(() => {
+    if (!workout || finished) return;
+
+    void activateKeepAwakeAsync(WORKOUT_KEEP_AWAKE_TAG).catch(() => {});
+    return () => {
+      void deactivateKeepAwake(WORKOUT_KEEP_AWAKE_TAG).catch(() => {});
+    };
+  }, [workout, finished]);
+
+  useEffect(() => {
     if (!id || !profile) return;
 
     let cancelled = false;
 
     (async () => {
-      const [workoutRes, assessmentRes] = await Promise.all([
+      const [workoutRes, assessmentRes, draft] = await Promise.all([
         supabase
           .from('workouts')
           .select('*, workout_days(*, workout_exercises(*, exercise:exercises(video_url, instructions, muscle_group)))')
@@ -190,15 +209,15 @@ export default function WorkoutSessionScreen() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        loadActiveWorkoutSession(),
       ]);
 
       const { data, error: loadError } = workoutRes;
 
       if (cancelled) return;
 
-      setBodyWeight(
-        typeof assessmentRes.data?.weight_kg === 'number' ? assessmentRes.data.weight_kg : null,
-      );
+      const assessmentWeight =
+        typeof assessmentRes.data?.weight_kg === 'number' ? assessmentRes.data.weight_kg : null;
 
       if (loadError) {
         setError(loadError.message);
@@ -206,13 +225,16 @@ export default function WorkoutSessionScreen() {
       } else if (!data) {
         setError('Treino não encontrado.');
         setWorkout(null);
+        if (draft?.workoutId === id) void clearActiveWorkoutSession().catch(() => {});
       } else {
         const loaded = data as unknown as WorkoutWithDays;
         setWorkout(loaded);
 
         const initialLogs: Record<string, LogValues> = {};
+        let exerciseCount = 0;
         loaded.workout_days?.forEach((day) => {
           day.workout_exercises?.forEach((exercise) => {
+            exerciseCount += 1;
             initialLogs[exercise.id] = {
               sets: exercise.sets != null ? String(exercise.sets) : '',
               reps: exercise.reps ?? '',
@@ -220,9 +242,32 @@ export default function WorkoutSessionScreen() {
             };
           });
         });
-        setLogs(initialLogs);
+
+        const validDraft = draft?.workoutId === id && draft.studentId === profile.id;
+        if (draft && !validDraft) void clearActiveWorkoutSession().catch(() => {});
+
+        if (validDraft) {
+          setStartedAt(draft.startedAt);
+          setNow(Date.now());
+          setDone(draft.done ?? {});
+          setLogs({ ...initialLogs, ...(draft.logs ?? {}) });
+          setRestEndsAt(draft.restEndsAt ?? null);
+          setActiveIndex(
+            Math.max(0, Math.min(typeof draft.activeIndex === 'number' ? draft.activeIndex : 0, exerciseCount - 1)),
+          );
+          setBodyWeight(draft.bodyWeight ?? assessmentWeight);
+        } else {
+          setStartedAt(Date.now());
+          setNow(Date.now());
+          setDone({});
+          setLogs(initialLogs);
+          setRestEndsAt(null);
+          setActiveIndex(0);
+          setBodyWeight(assessmentWeight);
+        }
         setError(null);
       }
+      setHydrated(true);
       setLoading(false);
     })();
 
@@ -265,7 +310,23 @@ export default function WorkoutSessionScreen() {
   const restRemaining = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
   const restActive = restEndsAt !== null && restRemaining > 0;
   const completedCount = exercises.filter((exercise) => done[exercise.id]).length;
+  const allDone = exercises.length > 0 && completedCount === exercises.length;
   const vibratedFor = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!hydrated || !workout || !profile || finished) return;
+
+    void saveActiveWorkoutSession({
+      workoutId: workout.id,
+      studentId: profile.id,
+      startedAt,
+      done,
+      logs,
+      restEndsAt,
+      activeIndex,
+      bodyWeight,
+    }).catch(() => {});
+  }, [hydrated, workout, profile, startedAt, done, logs, restEndsAt, activeIndex, bodyWeight, finished]);
 
   useEffect(() => {
     if (restEndsAt !== null && restRemaining === 0 && vibratedFor.current !== restEndsAt) {
@@ -330,12 +391,28 @@ export default function WorkoutSessionScreen() {
     setModal(null);
   }
 
-  function handleExit() {
+  function leaveWorkout() {
+    void clearActiveWorkoutSession().catch(() => {});
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/aluno/(tabs)/treinos' as never);
     }
+  }
+
+  function handleExit() {
+    const message = 'Sair do treino? O progresso desta sessão será encerrado.';
+    if (Platform.OS === 'web') {
+      const browser = (globalThis as { window?: { confirm?: (text: string) => boolean } }).window;
+      if (browser?.confirm && !browser.confirm(message)) return;
+      leaveWorkout();
+      return;
+    }
+
+    Alert.alert('Sair do treino?', 'O progresso desta sessão será encerrado.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: leaveWorkout },
+    ]);
   }
 
   async function finishWorkout() {
@@ -399,6 +476,7 @@ export default function WorkoutSessionScreen() {
       }
     }
 
+    await clearActiveWorkoutSession().catch(() => {});
     setSaving(false);
     setFinished({ duration, calories, loadKg });
   }
@@ -554,9 +632,13 @@ export default function WorkoutSessionScreen() {
         <Pressable
           onPress={handleExit}
           accessibilityRole="button"
-          accessibilityLabel="Voltar"
-          style={styles.headerIconButton}>
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
+          accessibilityLabel="Sair do treino"
+          style={[
+            styles.exitHeaderButton,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+          ]}>
+          <Ionicons name="chevron-back" size={19} color={theme.text} />
+          <Text style={[styles.exitHeaderText, { color: theme.text }]}>Sair</Text>
         </Pressable>
 
         <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
@@ -640,7 +722,11 @@ export default function WorkoutSessionScreen() {
       {activeExercise ? (
         <>
           <ScrollView
-            ref={carouselRef}
+            style={styles.sessionVertical}
+            contentContainerStyle={styles.sessionVerticalContent}
+            showsVerticalScrollIndicator={false}>
+            <ScrollView
+              ref={carouselRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             snapToInterval={snapInterval}
@@ -811,28 +897,50 @@ export default function WorkoutSessionScreen() {
                   </View>
                 </Card>
               );
-            })}
-          </ScrollView>
+              })}
+            </ScrollView>
 
-        {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
+            {error ? <Text style={[styles.error, { color: Brand.danger }]}>{error}</Text> : null}
 
-        <View style={styles.pagination}>
-          {exercises.map((exercise, index) => (
-            <Pressable
-              key={exercise.id}
-              onPress={() => goToExercise(index)}
-              accessibilityRole="button"
-              accessibilityLabel={`Ir para o exercício ${index + 1}`}
-              style={[
-                styles.paginationDot,
-                {
-                  backgroundColor: index === activeIndex ? Brand.primary : theme.border,
-                  width: index === activeIndex ? 24 : 8,
-                },
-              ]}
+
+          <View style={styles.pagination}>
+            {exercises.map((exercise, index) => (
+              <Pressable
+                key={exercise.id}
+                onPress={() => goToExercise(index)}
+                accessibilityRole="button"
+                accessibilityLabel={`Ir para o exercício ${index + 1}`}
+                style={[
+                  styles.paginationDot,
+                  {
+                    backgroundColor: index === activeIndex ? Brand.primary : theme.border,
+                    width: index === activeIndex ? 24 : 8,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+
+          <View style={[styles.finishFooter, { borderColor: theme.border }]}>
+            <View style={styles.finishFooterCopy}>
+              <Text style={[styles.finishFooterTitle, { color: theme.text }]}>
+                {allDone ? 'Todos os exercícios concluídos' : `${completedCount} de ${exercises.length} concluídos`}
+              </Text>
+              <Text style={[styles.finishFooterHint, { color: theme.textSecondary }]}>
+                {allDone
+                  ? 'Registre sua sessão e veja o resultado.'
+                  : 'Você pode finalizar mesmo sem marcar todos.'}
+              </Text>
+            </View>
+            <Button
+              title={saving ? 'Salvando...' : 'Finalizar treino'}
+              onPress={finishWorkout}
+              disabled={saving}
+              variant={allDone ? 'primary' : 'secondary'}
+              style={styles.finishFooterButton}
             />
-          ))}
-        </View>
+          </View>
+          </ScrollView>
         </>
       ) : (
         <>
@@ -1055,6 +1163,54 @@ const styles = StyleSheet.create({
   sessionScreen: {
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
+  },
+  sessionVertical: {
+    flex: 1,
+  },
+  sessionVerticalContent: {
+    gap: Spacing.two,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.three,
+  },
+  exitHeaderButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    zIndex: 11,
+  },
+  exitHeaderText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  finishFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  finishFooterCopy: {
+    flex: 1,
+    minWidth: 160,
+    gap: 2,
+  },
+  finishFooterTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  finishFooterHint: {
+    fontSize: 11,
+  },
+  finishFooterButton: {
+    minWidth: 180,
+    minHeight: 44,
   },
   sessionBody: {
     flex: 1,

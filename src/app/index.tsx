@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { Loading } from '@/components/ui/loading';
 import { supabase } from '@/lib/supabase';
+import { clearActiveWorkoutSession, loadActiveWorkoutSession } from '@/lib/workouts';
 import { useAuth } from '@/providers/auth-provider';
 
 export default function Index() {
@@ -12,11 +13,38 @@ export default function Index() {
     (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
   );
   const [checkedProfileId, setCheckedProfileId] = useState<string | null>(null);
+  const [activeWorkoutId, setActiveWorkoutId] = useState<string | null>(null);
+  const [checkingWorkout, setCheckingWorkout] = useState(true);
   const checkingAutonomous = isAutonomous && Boolean(profile?.id) && checkedProfileId !== profile?.id;
 
   useEffect(() => {
     let active = true;
-    if (!profile || !isAutonomous || !checkingAutonomous) {
+    if (!profile) return () => { active = false; };
+
+    (async () => {
+      const draft = await loadActiveWorkoutSession();
+      if (!active) return;
+      if (!draft) {
+        setCheckingWorkout(false);
+        return;
+      }
+      if (draft.studentId !== profile.id) {
+        await clearActiveWorkoutSession();
+        setCheckingWorkout(false);
+        return;
+      }
+      setActiveWorkoutId(draft.workoutId);
+      setCheckingWorkout(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [profile]);
+
+  useEffect(() => {
+    let active = true;
+    if (!profile || !isAutonomous || !checkingAutonomous || checkingWorkout || activeWorkoutId) {
       return () => {
         active = false;
       };
@@ -44,7 +72,7 @@ export default function Index() {
     return () => {
       active = false;
     };
-  }, [profile, isAutonomous, checkingAutonomous, router]);
+  }, [profile, isAutonomous, checkingAutonomous, checkingWorkout, activeWorkoutId, router]);
 
   if (loading) {
     return <Loading label="Carregando..." />;
@@ -56,6 +84,14 @@ export default function Index() {
 
   if (!profile) {
     return <Loading label="Carregando perfil..." />;
+  }
+
+  if (checkingWorkout) {
+    return <Loading label="Verificando treino..." />;
+  }
+
+  if (activeWorkoutId && profile.role !== 'personal' && profile.role !== 'admin') {
+    return <Redirect href={`/aluno/treino/${activeWorkoutId}` as never} />;
   }
 
   if (isAutonomous && checkingAutonomous) {
