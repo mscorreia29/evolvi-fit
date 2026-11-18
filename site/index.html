@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Evolvi Fit — Treinos, acompanhamento e IA</title>
+    <title>Evolvi Fit — Treinos, alimentação e IA</title>
     <meta
       name="description"
-      content="Evolvi Fit é a plataforma para personais trainers, alunos e alunos autônomos: montagem e execução de treinos, anamnese, avaliação física, comunicação, pagamentos, notificações e treinos gerados por IA."
+      content="Evolvi Fit é a plataforma para personais trainers, alunos vinculados e autônomos: treinos, alimentação com IA e cálculo calórico, anamnese, avaliação física, comunicação, pagamentos, notificações e Admin Master."
     />
     <meta name="theme-color" content="#10182E" />
     <link rel="icon" href="assets/favicon-32.png" sizes="32x32" />
@@ -22,6 +22,9 @@
       </symbol>
       <symbol id="i-spark" viewBox="0 0 24 24">
         <path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z" />
+      </symbol>
+      <symbol id="i-flame" viewBox="0 0 24 24">
+        <path d="M12 3c1.5 3.2.4 5.2-1.2 6.8C9 11.2 8 12.7 8 15a4 4 0 0 0 8 0c0-1.7-.7-3-1.8-4.2.1 1.4-.5 2.3-1.3 2.7.4-2.5-.4-5.2-3-7.5Z" />
       </symbol>
       <symbol id="i-chart" viewBox="0 0 24 24">
         <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
@@ -59,6 +62,7 @@
         </a>
         <nav class="nav-links" aria-label="Navegação principal">
           <a href="#recursos">Recursos</a>
+          <a href="#alimentacao">Alimentação</a>
           <a href="#como-funciona">Como funciona</a>
           <a href="#ia">IA</a>
           <a href="#seguranca">Segurança</a>
@@ -74,12 +78,12 @@
     <main id="top">
       <section class="hero container">
         <div class="hero-copy">
-          <span class="eyebrow"><span class="pulse"></span> Novo: treinos gerados por IA</span>
-          <h1>Treinos que evoluem <em>com você.</em></h1>
+          <span class="eyebrow"><span class="pulse"></span> Novo: treinos e alimentação com IA</span>
+          <h1>Treinos e nutrição que evoluem <em>com você.</em></h1>
           <p class="lead">
-            O Evolvi Fit reúne montagem de treinos, execução guiada, anamnese, acompanhamento,
-            comunicação e pagamentos em uma só plataforma. Para personais que querem escalar seu
-            atendimento e para alunos que querem treinar com propósito.
+            O Evolvi Fit reúne treinos guiados, plano alimentar com cálculo calórico, anamnese,
+            acompanhamento, comunicação e pagamentos em uma só plataforma. Para personais que querem
+            escalar seu atendimento e para alunos que querem evoluir com propósito.
           </p>
           <div class="hero-actions">
             <a class="btn btn-primary" href="https://evolvi-fit.vercel.app/signup-autonomo">
@@ -91,7 +95,7 @@
           </div>
           <div class="hero-proof">
             <div><strong>3</strong><span>perfis de acesso</span></div>
-            <div><strong>IA</strong><span>Gemini e OpenAI</span></div>
+            <div><strong>IA</strong><span>treino e nutrição</span></div>
             <div><strong>PWA</strong><span>web instalável</span></div>
           </div>
         </div>
@@ -149,7 +153,7 @@
         <div class="container strip-grid">
           <div><svg><use href="#i-users" /></svg><span>Personal trainers</span></div>
           <div><svg><use href="#i-dumbbell" /></svg><span>Alunos vinculados</span></div>
-          <div><svg><use href="#i-spark" /></svg><span>Alunos autônomos com IA</span></div>
+          <div><svg><use href="#i-spark" /></svg><span>Autônomos e plano IA</span></div>
           <div><svg><use href="#i-shield" /></svg><span>Admin Master</span></div>
         </div>
       </section>
@@ -160,16 +164,17 @@
           <h2>Mais que um gerador de treinos.</h2>
           <p>
             O Evolvi Fit cobre a jornada inteira: do primeiro contato com o aluno até a execução do
-            treino, o feedback semanal e a gestão do negócio do personal.
+            treino, a alimentação com meta calórica, o feedback semanal e a gestão do negócio do
+            personal.
           </p>
         </div>
         <div class="three-cols">
           <article class="feature-card">
             <span class="feature-icon"><svg><use href="#i-dumbbell" /></svg></span>
-            <h3>Para treinar</h3>
+            <h3>Para treinar e comer</h3>
             <p>
-              Treinos por dia da semana, vídeos dos exercícios, cronômetro, descanso, carga, séries,
-              repetições e registro de sessão.
+              Treinos por dia da semana, vídeos, cronômetro, descanso, carga e séries, além de plano
+              alimentar IA com gasto e meta calórica diária.
             </p>
           </article>
           <article class="feature-card">
@@ -184,8 +189,8 @@
             <span class="feature-icon"><svg><use href="#i-spark" /></svg></span>
             <h3>Para escalar</h3>
             <p>
-              Cadastro autônomo com IA, convites, gestão financeira, chat, auditoria e controle
-              global pelo Admin Master.
+              Cadastro autônomo com IA, gestão financeira manual, admin master, controle de
+              autônomos, auditoria e fallback entre provedores de IA.
             </p>
           </article>
         </div>
@@ -196,7 +201,7 @@
           <div class="section-head">
             <span class="kicker">RECURSOS</span>
             <h2>Tudo o que o app faz</h2>
-            <p>Quatro áreas conectadas, cada uma com ferramentas próprias.</p>
+            <p>Cinco áreas conectadas: personal, aluno vinculado, autônomo, nutrição e administração.</p>
           </div>
 
           <div class="audience">
@@ -210,7 +215,7 @@
               <article><svg><use href="#i-chart" /></svg><div><h4>Ficha e evolução</h4><p>Anamnese, avaliação física, metas, notas privadas, check-ins semanais e desafios diários.</p></div></article>
               <article><svg><use href="#i-chat" /></svg><div><h4>Comunicação</h4><p>Chat individual, não lidas, solicitações de feedback e respostas com status aberto/lido/resolvido.</p></div></article>
               <article><svg><use href="#i-card" /></svg><div><h4>Financeiro</h4><p>Cobranças por aluno, vencimento, status pendente/pago/atrasado/cancelado e lembretes automáticos.</p></div></article>
-              <article><svg><use href="#i-spark" /></svg><div><h4>Plano alimentar</h4><p>Refeições, horários, itens, quantidades e calorias calculadas automaticamente.</p></div></article>
+              <article><svg><use href="#i-spark" /></svg><div><h4>Plano alimentar</h4><p>Refeições, horários, opções completas, quantidades e calorias por opção.</p></div></article>
             </div>
           </div>
 
@@ -225,6 +230,7 @@
               <article><svg><use href="#i-bell" /></svg><div><h4>Notificações certas</h4><p>Lembretes de treino, água, refeição, check-in, mensagens, metas e novos treinos publicados.</p></div></article>
               <article><svg><use href="#i-chat" /></svg><div><h4>Fale com seu personal</h4><p>Chat direto, envio de feedback e acompanhamento das respostas e cobranças.</p></div></article>
               <article><svg><use href="#i-shield" /></svg><div><h4>Seus dados</h4><p>Anamnese, avaliações, metas, exportação em JSON e solicitação de exclusão de conta.</p></div></article>
+              <article><svg><use href="#i-flame" /></svg><div><h4>Alimentação com IA</h4><p>Gere ou regenere seu plano, informe preferências por refeição e veja gasto e meta calórica.</p></div></article>
               <article><svg><use href="#i-spark" /></svg><div><h4>Engajamento</h4><p>Desafio do dia, missões, XP, check-in semanal e capa personalizada pelo seu personal.</p></div></article>
             </div>
           </div>
@@ -237,9 +243,10 @@
             <div class="feature-grid">
               <article><svg><use href="#i-users" /></svg><div><h4>Cadastro direto</h4><p>Entre como aluno autônomo, sem convite e sem vínculo com personal trainer.</p></div></article>
               <article><svg><use href="#i-chart" /></svg><div><h4>Anamnese completa</h4><p>Idade, peso, altura, objetivo, nível, dias por semana, duração, local, restrições e lesões.</p></div></article>
-              <article><svg><use href="#i-spark" /></svg><div><h4>Plano gerado por IA</h4><p>Gemini ou OpenAI montam dias, exercícios, séries, repetições e descanso em JSON validado.</p></div></article>
-              <article><svg><use href="#i-dumbbell" /></svg><div><h4>Mesma experiência</h4><p>O treino gerado aparece na aba de treinos e usa o mesmo player de execução dos demais alunos.</p></div></article>
-              <article><svg><use href="#i-shield" /></svg><div><h4>Limite controlado</h4><p>Intervalo entre gerações e liberação manual de regeneração pelo administrador.</p></div></article>
+              <article><svg><use href="#i-spark" /></svg><div><h4>Planos gerados por IA</h4><p>Treinos e alimentação são montados com Gemini ou OpenAI, com fallback automático entre provedores.</p></div></article>
+              <article><svg><use href="#i-flame" /></svg><div><h4>Meta calórica</h4><p>Idade, peso, altura, treinos e objetivo definem gasto diário e o quanto comer para emagrecer, manter ou ganhar massa.</p></div></article>
+              <article><svg><use href="#i-dumbbell" /></svg><div><h4>Mesma experiência</h4><p>Os planos aparecem nas abas de treinos e alimentação, com o mesmo player e recursos dos demais alunos.</p></div></article>
+              <article><svg><use href="#i-shield" /></svg><div><h4>Limite controlado</h4><p>Intervalo entre gerações de treino e plano alimentar, com liberação manual pelo Admin Master.</p></div></article>
               <article><svg><use href="#i-bell" /></svg><div><h4>Chave segura</h4><p>A chave de IA fica no servidor, em secrets do Supabase ou no painel admin, nunca no bundle web.</p></div></article>
             </div>
           </div>
@@ -251,7 +258,8 @@
             </div>
             <div class="feature-grid">
               <article><svg><use href="#i-users" /></svg><div><h4>Personais</h4><p>Aprovar, rejeitar, bloquear, liberar dias de acesso, criar conta, trocar email e redefinir senha.</p></div></article>
-              <article><svg><use href="#i-chart" /></svg><div><h4>Painel e métricas</h4><p>Contadores de personais, alunos, cobranças pendentes, bloqueios e ações de auditoria.</p></div></article>
+              <article><svg><use href="#i-spark" /></svg><div><h4>Autônomos</h4><p>Editar dados, bloquear, estender teste, registrar pagamento, revogar acesso e destravar gerações de IA.</p></div></article>
+              <article><svg><use href="#i-chart" /></svg><div><h4>Painel e métricas</h4><p>Contadores de personais, alunos vinculados, autônomos, cobranças pendentes, bloqueios e auditoria.</p></div></article>
               <article><svg><use href="#i-card" /></svg><div><h4>Cobranças e pagamentos</h4><p>Visão de todas as cobranças, filtros por status e ações de pago/cancelado.</p></div></article>
               <article><svg><use href="#i-spark" /></svg><div><h4>Configurações de IA</h4><p>Ativar cadastro autônomo, escolher provedor, modelo, prompt, intervalo e regeneração livre.</p></div></article>
               <article><svg><use href="#i-shield" /></svg><div><h4>Regras globais</h4><p>Dias de teste, auto-cadastro de personais, bloqueio de trial vencido e limite de alunos.</p></div></article>
@@ -268,7 +276,7 @@
         </div>
         <div class="steps">
           <article><span>01</span><h3>Entre</h3><p>Crie como personal, aceite um convite de aluno ou faça cadastro autônomo com IA.</p></article>
-          <article><span>02</span><h3>Prepare</h3><p>Preencha anamnese e avaliação física, ou deixe a IA montar o plano automaticamente.</p></article>
+          <article><span>02</span><h3>Prepare</h3><p>Preencha anamnese e avaliação física, ou deixe a IA montar treinos, alimentação e meta calórica.</p></article>
           <article><span>03</span><h3>Treine</h3><p>Abra o treino no app, siga vídeos, timer e descanso, registre séries, repetições e carga.</p></article>
           <article><span>04</span><h3>Evolua</h3><p>Acompanhe histórico, metas, check-ins, feedbacks, notificações e ajustes do personal.</p></article>
         </div>
@@ -278,16 +286,16 @@
         <div class="container ia-grid">
           <div class="ia-copy">
             <span class="kicker">INTELIGÊNCIA ARTIFICIAL</span>
-            <h2>Um treino feito para o seu corpo, não um modelo genérico.</h2>
+            <h2>Planos feitos para o seu corpo, não um modelo genérico.</h2>
             <p>
-              No cadastro autônomo, você responde a uma anamnese objetiva. A Edge Function valida a
-              sessão, respeita o intervalo de geração, chama Gemini ou OpenAI e salva o plano nas
-              mesmas tabelas de treinos do app.
+              A anamnese alimenta treinos e alimentação. As Edge Functions validam a sessão,
+              respeitam o intervalo de geração, tentam Gemini e OpenAI com fallback automático e
+              salvam tudo nas mesmas tabelas usadas pelo app.
             </p>
             <ul class="check-list">
-              <li><svg><use href="#i-check" /></svg>Até 7 dias e 12 exercícios por dia</li>
-              <li><svg><use href="#i-check" /></svg>Séries, repetições, descanso e notas validados</li>
-              <li><svg><use href="#i-check" /></svg>Restrições e lesões consideradas no prompt</li>
+              <li><svg><use href="#i-check" /></svg>Até 7 dias e 25 exercícios por dia com vídeo</li>
+              <li><svg><use href="#i-check" /></svg>5 refeições, 6 opções completas e calorias por opção</li>
+              <li><svg><use href="#i-check" /></svg>Restrições, lesões e preferências no prompt</li>
               <li><svg><use href="#i-check" /></svg>Regeneração controlada pelo Admin Master</li>
             </ul>
             <a class="link-arrow" href="https://evolvi-fit.vercel.app/signup-autonomo">
@@ -298,8 +306,54 @@
             <img src="assets/fitness-workout.jpg" alt="Aluno treinando com peso livre na academia" />
             <div class="ia-overlay">
               <span class="pulse"></span>
-              <div><small>IA → JSON validado → treino ativo</small><strong>Pronto para treinar</strong></div>
+              <div><small>IA → JSON validado → app</small><strong>Treino e nutrição ativos</strong></div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-alt" id="alimentacao">
+        <div class="container nutrition-grid">
+          <div class="nutrition-copy">
+            <span class="kicker">ALIMENTAÇÃO COM IA</span>
+            <h2>Comer com meta, não no achismo.</h2>
+            <p>
+              A IA usa idade, peso, altura, rotina de treinos e objetivo para estimar o gasto diário
+              e sugerir quantas calorias ingerir. Se a meta é emagrecer, o plano mostra o déficit; se
+              é ganhar massa, mostra o superávit.
+            </p>
+            <ul class="check-list">
+              <li><svg><use href="#i-check" /></svg>5 refeições com 6 opções completas cada</li>
+              <li><svg><use href="#i-check" /></svg>Ficha por café, lanche, almoço, jantar e frutas</li>
+              <li><svg><use href="#i-check" /></svg>Gasto diário, meta calórica e valor por refeição</li>
+              <li><svg><use href="#i-check" /></svg>Disponível para alunos autônomos e vinculados</li>
+            </ul>
+            <a class="link-arrow" href="https://evolvi-fit.vercel.app/aluno/alimentacao">
+              Ver alimentação no app <svg><use href="#i-arrow" /></svg>
+            </a>
+          </div>
+          <div class="nutrition-card">
+            <div class="nutrition-card-head">
+              <span><svg><use href="#i-flame" /></svg> Gasto e meta calórica</span>
+              <span class="tag tag-ghost">CALCULADO POR IA</span>
+            </div>
+            <div class="nutrition-metrics">
+              <div>
+                <small>Você gasta</small>
+                <strong>3.000</strong>
+                <span>kcal por dia</span>
+              </div>
+              <div class="nutrition-target">
+                <small>Você come</small>
+                <strong>2.500</strong>
+                <span>kcal por dia</span>
+              </div>
+            </div>
+            <div class="nutrition-result">
+              <span class="tag">Emagrecer</span>
+              <p>Déficit de 500 kcal/dia · cerca de 500 kcal por refeição</p>
+            </div>
+            <div class="nutrition-strip">Idade · Peso · Altura · Treinos · Objetivo</div>
           </div>
         </div>
       </section>
@@ -367,8 +421,8 @@
           <span class="kicker">ACESSO</span>
           <h2>Como funciona a liberação</h2>
           <p>
-            O sistema usa teste e liberação administrativa. Não existe checkout online ou plano
-            assinado automaticamente no aplicativo.
+            O sistema usa teste de 7 dias e liberação administrativa. Não existe checkout online ou
+            assinatura automática: o Admin Master registra pagamentos manualmente.
           </p>
         </div>
         <div class="three-cols">
@@ -380,7 +434,7 @@
           <article class="plan-card featured">
             <span class="plan-name">Aluno</span>
             <strong>Vinculado ou autônomo</strong>
-            <p>Entra por convite do personal ou pelo cadastro autônomo com IA, quando habilitado.</p>
+            <p>Entra por convite ou cadastro autônomo. Os dois perfis podem usar treinos e alimentação com IA.</p>
           </article>
           <article class="plan-card">
             <span class="plan-name">Pagamentos</span>
@@ -411,8 +465,26 @@
             </p>
           </details>
           <details>
+            <summary>Como a IA calcula as calorias?</summary>
+            <p>
+              Ela usa uma estimativa de gasto basal com idade, peso e altura, multiplica pela rotina
+              de treinos e aplica déficit para emagrecer, superávit para ganhar massa ou manutenção.
+              O app mostra gasto diário, meta diária e calorias por refeição.
+            </p>
+          </details>
+          <details>
+            <summary>Alunos vinculados também usam alimentação com IA?</summary>
+            <p>
+              Sim. O plano é salvo no vínculo com o personal, respeitando permissões e a configuração
+              de geração feita pelo Admin Master.
+            </p>
+          </details>
+          <details>
             <summary>Quais provedores de IA são suportados?</summary>
-            <p>Gemini e OpenAI. A escolha, o modelo e a chave ficam no painel Admin Master ou em secrets do Supabase.</p>
+            <p>
+              Gemini e OpenAI, com fallback automático entre eles. A escolha, o modelo e a chave ficam
+              no painel Admin Master ou em secrets do Supabase.
+            </p>
           </details>
           <details>
             <summary>Posso exportar ou excluir meus dados?</summary>
@@ -435,8 +507,8 @@
         <div class="container cta-inner">
           <div>
             <span class="kicker">PRONTO PARA COMEÇAR?</span>
-            <h2>Seu próximo treino começa aqui.</h2>
-            <p>Entre na conta, gere seu plano com IA ou comece a gerenciar seus alunos hoje.</p>
+            <h2>Seu próximo treino e sua meta calórica começam aqui.</h2>
+            <p>Entre na conta, gere treinos e alimentação com IA ou comece a gerenciar seus alunos hoje.</p>
           </div>
           <div class="cta-actions">
             <a class="btn btn-light" href="https://evolvi-fit.vercel.app/login">Abrir o app</a>
@@ -454,7 +526,7 @@
         </div>
         <div>
           <strong>Produto</strong>
-          <a href="#recursos">Recursos</a><a href="#ia">IA</a><a href="#como-funciona">Como funciona</a>
+          <a href="#recursos">Recursos</a><a href="#ia">IA</a><a href="#alimentacao">Alimentação</a><a href="#como-funciona">Como funciona</a>
         </div>
         <div>
           <strong>Acesso</strong>
