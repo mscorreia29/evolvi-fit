@@ -276,6 +276,9 @@ export type MealPlan = {
   title: string;
   notes: string | null;
   ai_generated?: boolean;
+  daily_burn_kcal?: number | null;
+  daily_target_kcal?: number | null;
+  calorie_goal?: 'lose' | 'gain' | 'maintain' | null;
   meals: Meal[];
   created_at: string;
   updated_at: string;

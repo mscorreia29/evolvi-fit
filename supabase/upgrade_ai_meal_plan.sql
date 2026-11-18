@@ -1,5 +1,8 @@
 alter table public.meal_plans
-  add column if not exists ai_generated boolean not null default false;
+  add column if not exists ai_generated boolean not null default false,
+  add column if not exists daily_burn_kcal integer,
+  add column if not exists daily_target_kcal integer,
+  add column if not exists calorie_goal text;
 
 alter table public.profiles
   add column if not exists ai_meal_last_generated_at timestamptz,

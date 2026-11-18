@@ -384,7 +384,10 @@ create table if not exists public.meal_plans (
 create index if not exists meal_plans_student_idx on public.meal_plans(student_id);
 
 alter table public.meal_plans
-  add column if not exists ai_generated boolean not null default false;
+  add column if not exists ai_generated boolean not null default false,
+  add column if not exists daily_burn_kcal integer,
+  add column if not exists daily_target_kcal integer,
+  add column if not exists calorie_goal text;
 
 alter table public.meal_plans enable row level security;
 

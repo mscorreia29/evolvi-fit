@@ -12,6 +12,7 @@ const mealSystemPrompt = [
   'Use obrigatoriamente os alimentos que a pessoa mais gosta. Quando a ficha trouxer preferências por refeição (café, lanche, almoço, jantar e frutas), respeite cada uma na refeição correspondente e adapte o restante à rotina informada.',
   'Em todas as refeições, preencha notes exatamente com "Escolha 1 opção desta refeição."',
   'Respeite objetivo, restrições, lesões, idade, peso, altura e preferências informadas.',
+  'Quando o contexto informar meta calórica diária, distribua as calorias das opções de modo que cada refeição fique próxima de meta/5 kcal e nunca ultrapasse a meta diária ao escolher 1 opção por refeição.',
   'Não prescreva medicamentos, suplementos obrigatórios ou dietas radicais. Em caso de dúvida, priorize alimentos naturais e oriente procurar um profissional presencial.',
 ].join(' ');
 
@@ -67,6 +68,17 @@ type MealPlan = {
   meals: Meal[];
 };
 
+type CalorieGoal = 'lose' | 'gain' | 'maintain';
+
+type CalorieCalculation = {
+  bmr: number;
+  burn: number;
+  target: number;
+  goal: CalorieGoal;
+  adjustment: number;
+  activityFactor: number;
+};
+
 const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '');
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -94,6 +106,69 @@ async function rest(path: string, init: RequestInit = {}) {
     throw new Error(text || `Supabase REST ${response.status}`);
   }
   return text ? JSON.parse(text) : null;
+}
+
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function calculateCalories(context: Record<string, unknown>): CalorieCalculation | null {
+  const age = finiteNumber(context.age);
+  const weight = finiteNumber(context.weight_kg);
+  const height = finiteNumber(context.height_cm);
+  if (
+    age === null ||
+    weight === null ||
+    height === null ||
+    age < 12 ||
+    age > 100 ||
+    weight < 30 ||
+    weight > 300 ||
+    height < 100 ||
+    height > 250
+  ) {
+    return null;
+  }
+
+  const bmr = Math.round(10 * weight + 6.25 * height - 5 * age - 78);
+  const days = finiteNumber(context.days_per_week) ?? 0;
+  const minutes = finiteNumber(context.session_minutes) ?? 0;
+  const level = String(context.level ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  let activityFactor = 1.2;
+  if (days >= 6) activityFactor = 1.725;
+  else if (days >= 4) activityFactor = 1.6;
+  else if (days >= 2) activityFactor = 1.45;
+  else if (days >= 1) activityFactor = 1.375;
+
+  if (minutes >= 75) activityFactor += 0.075;
+  else if (minutes >= 60) activityFactor += 0.05;
+  if (/avancad|experiente/.test(level)) activityFactor += 0.05;
+  activityFactor = Math.min(1.9, Math.max(1.2, activityFactor));
+
+  const burn = Math.round(bmr * activityFactor);
+  const objective = String(context.objective ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  let goal: CalorieGoal = 'maintain';
+  let adjustment = 0;
+  if (/emagre|perder|secar|reduz|deficit/.test(objective)) {
+    goal = 'lose';
+    adjustment = -500;
+  } else if (/ganhar|hipertrofi|mass[aa] muscular|aumentar/.test(objective)) {
+    goal = 'gain';
+    adjustment = 300;
+  }
+
+  const target = Math.max(Math.round(burn + adjustment), Math.round(bmr * 1.1), 1400);
+  return { bmr, burn, target, goal, adjustment, activityFactor };
 }
 
 function extractContent(payload: any) {
@@ -333,6 +408,8 @@ Deno.serve(async (req) => {
       full_name: profile.full_name ?? anamnesis.full_name ?? null,
       objective: anamnesis.objective ?? null,
       level: anamnesis.level ?? null,
+      days_per_week: anamnesis.days_per_week ?? measurements.days_per_week ?? null,
+      session_minutes: anamnesis.session_minutes ?? measurements.session_minutes ?? null,
       restrictions: anamnesis.restrictions ?? null,
       injuries: anamnesis.injuries ?? null,
       age: anamnesis.age ?? measurements.age ?? null,
@@ -348,9 +425,29 @@ Deno.serve(async (req) => {
       notes: String(payload?.notes ?? payload?.preferences ?? anamnesis.notes ?? '').slice(0, 500),
     };
 
+    const calories = calculateCalories(context);
+    const goalLabels: Record<CalorieGoal, string> = {
+      lose: 'emagrecer',
+      gain: 'ganhar massa',
+      maintain: 'manter peso',
+    };
     const prompt = [
       'Crie um plano alimentar personalizado com base nestes dados:',
-      JSON.stringify(context, null, 2),
+      JSON.stringify(
+        {
+          ...context,
+          calorie_target: calories
+            ? {
+                gasto_diario_kcal: calories.burn,
+                meta_diaria_kcal: calories.target,
+                objetivo: goalLabels[calories.goal],
+                ajuste_kcal: calories.adjustment,
+              }
+            : null,
+        },
+        null,
+        2,
+      ),
     ].join('\n');
 
     const aiPayload = await callProvider(settings, prompt);
@@ -369,6 +466,9 @@ Deno.serve(async (req) => {
           title: plan.title,
           notes: plan.notes,
           ai_generated: true,
+          daily_burn_kcal: calories?.burn ?? null,
+          daily_target_kcal: calories?.target ?? null,
+          calorie_goal: calories?.goal ?? null,
           meals: plan.meals,
           updated_at: now,
         }),
@@ -383,6 +483,9 @@ Deno.serve(async (req) => {
           title: plan.title,
           notes: plan.notes,
           ai_generated: true,
+          daily_burn_kcal: calories?.burn ?? null,
+          daily_target_kcal: calories?.target ?? null,
+          calorie_goal: calories?.goal ?? null,
           meals: plan.meals,
           updated_at: now,
         }),
@@ -406,7 +509,19 @@ Deno.serve(async (req) => {
       }),
     });
 
-    return json({ mealPlanId, title: plan.title, mealsCount: plan.meals.length });
+    return json({
+      mealPlanId,
+      title: plan.title,
+      mealsCount: plan.meals.length,
+      calories: calories
+        ? {
+            burn: calories.burn,
+            target: calories.target,
+            goal: calories.goal,
+            adjustment: calories.adjustment,
+          }
+        : null,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao gerar o plano alimentar.';
     return json({ error: message }, 500);

@@ -198,6 +198,12 @@ export async function generateAiMealPlan(input?: {
     mealPlanId?: string;
     title?: string;
     mealsCount?: number;
+    calories?: {
+      burn: number;
+      target: number;
+      goal: 'lose' | 'gain' | 'maintain';
+      adjustment: number;
+    } | null;
   } | null;
   if (!result || result.error) {
     throw new Error(result?.error ?? 'A IA não retornou um plano alimentar válido.');
@@ -210,6 +216,7 @@ export async function generateAiMealPlan(input?: {
     mealPlanId: result.mealPlanId,
     title: result.title ?? 'Plano alimentar IA',
     mealsCount: result.mealsCount ?? 0,
+    calories: result.calories ?? null,
   };
 }
 

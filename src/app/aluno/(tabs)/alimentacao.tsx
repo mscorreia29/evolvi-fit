@@ -73,6 +73,22 @@ function getSavedMealInput(profile: Profile | null): MealPlanInput | null {
   };
 }
 
+function formatKcal(value: number | null | undefined) {
+  return value == null ? '—' : Math.round(value).toLocaleString('pt-BR');
+}
+
+function calorieGoalLabel(goal: 'lose' | 'gain' | 'maintain' | null | undefined) {
+  if (goal === 'lose') return 'Emagrecer';
+  if (goal === 'gain') return 'Ganhar massa';
+  return 'Manter peso';
+}
+
+function calorieGoalHint(goal: 'lose' | 'gain' | 'maintain' | null | undefined) {
+  if (goal === 'lose') return 'Déficit de cerca de 500 kcal/dia para perda de gordura.';
+  if (goal === 'gain') return 'Superávit de cerca de 300 kcal/dia para ganho de massa.';
+  return 'Meta de manutenção calculada com base na sua rotina de treinos.';
+}
+
 export default function StudentNutritionScreen() {
   const theme = useTheme();
   const { profile, refreshProfile } = useAuth();
@@ -124,7 +140,10 @@ export default function StudentNutritionScreen() {
     setError(null);
     try {
       const result = await generateAiMealPlan(input);
-      setNotice(`${result.title} criado com ${result.mealsCount} refeições.`);
+      const calorieSummary = result.calories
+        ? ` Gasto: ${formatKcal(result.calories.burn)} kcal/dia. Meta: ${formatKcal(result.calories.target)} kcal/dia.`
+        : '';
+      setNotice(`${result.title} criado com ${result.mealsCount} refeições.${calorieSummary}`);
       await load();
       await refreshProfile();
       return true;
@@ -272,6 +291,38 @@ export default function StudentNutritionScreen() {
           />
           {notice ? <Text style={[styles.aiFeedback, { color: Brand.primary }]}>{notice}</Text> : null}
           {error ? <Text style={[styles.aiFeedback, { color: Brand.danger }]}>{error}</Text> : null}
+        </Card>
+      ) : null}
+
+      {plan?.daily_burn_kcal != null && plan.daily_target_kcal != null ? (
+        <Card style={[styles.calorieCard, { borderColor: Brand.accent }]}>
+          <View style={styles.calorieHeader}>
+            <Ionicons name="flame" size={18} color={Brand.accent} />
+            <Text style={[styles.calorieTitle, { color: theme.text }]}>Gasto e meta calórica</Text>
+            <View style={[styles.calorieBadge, { backgroundColor: Brand.accent }]}>
+              <Text style={styles.calorieBadgeText}>{calorieGoalLabel(plan.calorie_goal)}</Text>
+            </View>
+          </View>
+          <View style={styles.calorieStats}>
+            <View style={styles.calorieStat}>
+              <Text style={[styles.calorieLabel, { color: theme.textSecondary }]}>Você gasta</Text>
+              <Text style={[styles.calorieValue, { color: theme.text }]}>
+                {formatKcal(plan.daily_burn_kcal)}
+              </Text>
+              <Text style={[styles.calorieUnit, { color: theme.textSecondary }]}>kcal por dia</Text>
+            </View>
+            <View style={styles.calorieStat}>
+              <Text style={[styles.calorieLabel, { color: theme.textSecondary }]}>Você come</Text>
+              <Text style={[styles.calorieValue, { color: Brand.primary }]}>
+                {formatKcal(plan.daily_target_kcal)}
+              </Text>
+              <Text style={[styles.calorieUnit, { color: theme.textSecondary }]}>kcal por dia</Text>
+            </View>
+          </View>
+          <Text style={[styles.calorieHint, { color: theme.textSecondary }]}>
+            {calorieGoalHint(plan.calorie_goal)} Busque cerca de{' '}
+            {formatKcal(Math.round(plan.daily_target_kcal / 5))} kcal por refeição.
+          </Text>
         </Card>
       ) : null}
 
@@ -511,6 +562,54 @@ const styles = StyleSheet.create({
   aiFeedback: {
     fontSize: 12,
     fontWeight: '700',
+    lineHeight: 18,
+  },
+  calorieCard: {
+    borderWidth: 1,
+    gap: Spacing.two,
+  },
+  calorieHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    flexWrap: 'wrap',
+  },
+  calorieTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  calorieBadge: {
+    borderRadius: Radius.sm,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  calorieBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  calorieStats: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  calorieStat: {
+    flex: 1,
+    gap: 2,
+  },
+  calorieLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  calorieValue: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  calorieUnit: {
+    fontSize: 11,
+  },
+  calorieHint: {
+    fontSize: 12,
     lineHeight: 18,
   },
   notesCard: {
