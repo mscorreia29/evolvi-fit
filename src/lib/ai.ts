@@ -132,15 +132,74 @@ export async function generateAiWorkout(payload: AutonomousAnamnesis) {
     throw new Error(detail);
   }
 
-  const result = data as { error?: string; workoutId?: string; name?: string; days?: number } | null;
-  if (result?.error) {
-    throw new Error(result.error);
+  const result = data as {
+    error?: string;
+    workoutId?: string;
+    workoutIds?: string[];
+    name?: string;
+    days?: number;
+    workouts?: { id: string; name: string; exercises: number }[];
+  } | null;
+  if (!result || result.error) {
+    throw new Error(result?.error ?? 'A IA não retornou um treino válido.');
   }
-  if (!result?.workoutId) {
+  const workoutId = result.workoutId ?? result.workoutIds?.[0];
+  if (!workoutId) {
     throw new Error('A IA não retornou um treino válido.');
   }
 
-  return result as { workoutId: string; name: string; days: number };
+  return {
+    workoutId,
+    workoutIds: result.workoutIds ?? [workoutId],
+    name: result.name ?? 'Treino gerado por IA',
+    days: result.days ?? result.workoutIds?.length ?? 1,
+    workouts: result.workouts ?? [],
+  };
+}
+
+export async function generateAiMealPlan(input?: { notes?: string }) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) {
+    throw new Error('Sessão expirada. Entre novamente para continuar.');
+  }
+
+  const { data, error } = await supabase.functions.invoke('generate-ai-meal-plan', {
+    body: { notes: input?.notes ?? '' },
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (error) {
+    const context = (error as { context?: { json?: () => Promise<unknown> } }).context;
+    let detail = error.message || 'Falha ao chamar o serviço de IA.';
+    try {
+      const body = (await context?.json?.()) as { error?: string; message?: string } | undefined;
+      if (body?.error) detail = body.error;
+      else if (body?.message) detail = body.message;
+    } catch {}
+    throw new Error(detail);
+  }
+
+  const result = data as {
+    error?: string;
+    mealPlanId?: string;
+    title?: string;
+    mealsCount?: number;
+  } | null;
+  if (!result || result.error) {
+    throw new Error(result?.error ?? 'A IA não retornou um plano alimentar válido.');
+  }
+  if (!result.mealPlanId) {
+    throw new Error('A IA não retornou um plano alimentar válido.');
+  }
+
+  return {
+    mealPlanId: result.mealPlanId,
+    title: result.title ?? 'Plano alimentar IA',
+    mealsCount: result.mealsCount ?? 0,
+  };
 }
 
 export async function fetchAiSettings() {

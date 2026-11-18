@@ -14,7 +14,7 @@ create table if not exists public.ai_settings (
   enabled boolean not null default false,
   provider text not null default 'gemini' check (provider in ('gemini', 'openai')),
   api_key text,
-  prompt_base text not null default 'Você é um personal trainer experiente. Gere um plano de treino semanal seguro, objetivo e progressivo. Responda APENAS com JSON no formato: {"name":"...","days":[{"label":"A","exercises":[{"name":"...","sets":3,"reps":"10-12","rest_seconds":60,"notes":"..."}]}]}. Respeite restrições, nível, objetivo, dias disponíveis e local informados. Não inclua exercícios de alto impacto se houver lesão ou limitação.',
+  prompt_base text not null default 'Você é um personal trainer experiente. Gere blocos de treino semanais seguros, objetivo e progressivo. Responda APENAS com JSON no formato: {"name":"Plano ...","workouts":[{"name":"Treino A - ...","days":[{"label":"A","exercises":[{"name":"...","sets":3,"reps":"10-12","rest_seconds":60,"notes":"..."}]}]}]}. Crie exatamente a quantidade de blocos informada no pedido, cada um com de 3 a 8 exercícios. Nunca gere um único treino com todos os exercícios. Respeite restrições, nível, objetivo, dias disponíveis e local informados. Não inclua exercícios de alto impacto se houver lesão ou limitação.',
   generation_interval_days integer not null default 30 check (generation_interval_days between 1 and 365),
   allow_manual_regeneration boolean not null default false,
   model text,

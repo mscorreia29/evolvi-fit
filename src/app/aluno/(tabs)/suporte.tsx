@@ -30,6 +30,9 @@ const categories = [
 export default function StudentSupportScreen() {
   const theme = useTheme();
   const { profile } = useAuth();
+  const isAutonomous = Boolean(
+    (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
+  );
   const [coachId, setCoachId] = useState<string | null>(null);
   const [feedbacks, setFeedbacks] = useState<StudentFeedback[]>([]);
   const [dues, setDues] = useState<PaymentDue[]>([]);
@@ -43,7 +46,6 @@ export default function StudentSupportScreen() {
     if (!profile) return;
     const cid = await getMyCoachId(profile.id);
     setCoachId(cid);
-    if (!cid) return;
     const [{ data: fb }, { data: pd }] = await Promise.all([
       supabase
         .from('student_feedback')
@@ -69,12 +71,12 @@ export default function StudentSupportScreen() {
   );
 
   async function handleSendFeedback() {
-    if (!profile || !coachId || !message.trim()) return;
+    if (!profile || !message.trim()) return;
     setSending(true);
     setNotice(null);
     setError(null);
     const { error: sendError } = await supabase.from('student_feedback').insert({
-      coach_id: coachId,
+      coach_id: coachId ?? profile.id,
       student_id: profile.id,
       category,
       message: message.trim(),
@@ -86,7 +88,11 @@ export default function StudentSupportScreen() {
       return;
     }
     setMessage('');
-    setNotice('Feedback enviado! Seu personal poderá ver no acesso dele.');
+    setNotice(
+      isAutonomous
+        ? 'Feedback enviado! Nossa equipe poderá ver no suporte.'
+        : 'Feedback enviado! Seu personal poderá ver no acesso dele.',
+    );
     await load();
   }
 
@@ -102,7 +108,7 @@ export default function StudentSupportScreen() {
     cancelled: { label: 'Cancelado', tone: 'muted' },
   };
 
-  if (!coachId && profile) {
+  if (!coachId && profile && !isAutonomous) {
     return (
       <Screen>
         <PhotoHero source={Images.student} height={180} glowColor={Brand.accent}>
@@ -122,7 +128,10 @@ export default function StudentSupportScreen() {
       </PhotoHero>
 
       <Card>
-        <SectionHeader title="Enviar feedback" subtitle="Solicitações e sugestões para seu personal" />
+        <SectionHeader
+          title="Enviar feedback"
+          subtitle={isAutonomous ? 'Solicitações e sugestões para o suporte' : 'Solicitações e sugestões para seu personal'}
+        />
         <View style={styles.catRow}>
           {categories.map((c) => {
             const sel = category === c.key;
@@ -153,7 +162,9 @@ export default function StudentSupportScreen() {
       <Card>
         <SectionHeader title="Mensalidade" subtitle="Lembretes e status de pagamento" />
         {dues.length === 0 ? (
-          <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Nenhuma cobrança registrada pelo seu personal.</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+            {isAutonomous ? 'Você não possui cobranças registradas.' : 'Nenhuma cobrança registrada pelo seu personal.'}
+          </Text>
         ) : (
           dues.map((due) => {
             const meta = dueLabel[due.status] ?? dueLabel.pending;

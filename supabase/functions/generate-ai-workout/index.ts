@@ -35,9 +35,14 @@ type DayPlan = {
   exercises: ExercisePlan[];
 };
 
+type WorkoutBlock = {
+  name: string;
+  day: DayPlan;
+};
+
 type WorkoutPlan = {
   name: string;
-  days: DayPlan[];
+  blocks: WorkoutBlock[];
 };
 
 const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '');
@@ -79,7 +84,7 @@ function extractContent(payload: any) {
   return JSON.stringify(value);
 }
 
-function parsePlan(payload: any): WorkoutPlan {
+function parsePlan(payload: any, maxBlocks: number): WorkoutPlan {
   const raw = extractContent(payload);
   let cleaned = raw.trim();
   if (cleaned.startsWith('```')) {
@@ -91,31 +96,58 @@ function parsePlan(payload: any): WorkoutPlan {
     cleaned = cleaned.slice(firstBrace, lastBrace + 1);
   }
   const parsed = JSON.parse(cleaned);
-  const rawDays = Array.isArray(parsed?.days) ? parsed.days : [];
+  const baseName = String(parsed?.name ?? 'Treino gerado por IA').slice(0, 80);
+  const rawWorkouts = Array.isArray(parsed?.workouts) ? parsed.workouts : [];
+  const rawDays = rawWorkouts.length
+    ? rawWorkouts.flatMap((workout: any) =>
+        Array.isArray(workout?.days) ? workout.days : [],
+      )
+    : Array.isArray(parsed?.days)
+      ? parsed.days
+      : [];
 
-  const days = rawDays.slice(0, 7).map((day: any, dayIndex: number) => {
-    const rawExercises = Array.isArray(day?.exercises) ? day.exercises : [];
-    const exercises = rawExercises.slice(0, 12).map((exercise: any) => ({
-      name: String(exercise?.name ?? 'Exercício').slice(0, 120),
-      sets: Math.min(12, Math.max(1, Number(exercise?.sets) || 3)),
-      reps: String(exercise?.reps ?? '10-12').slice(0, 40),
-      rest_seconds: Math.min(600, Math.max(0, Number(exercise?.rest_seconds) || 60)),
-      notes: exercise?.notes ? String(exercise.notes).slice(0, 300) : null,
-    }));
-    return {
-      label: String(day?.label ?? String.fromCharCode(65 + dayIndex)).slice(0, 4),
-      exercises,
-    };
-  });
+  const maxExercises = Math.min(60, maxBlocks * 8);
+  const exercises = rawDays
+    .flatMap((day: any) =>
+      (Array.isArray(day?.exercises) ? day.exercises : []).map((exercise: any) => ({
+        name: String(exercise?.name ?? 'Exercício').slice(0, 120),
+        sets: Math.min(12, Math.max(1, Number(exercise?.sets) || 3)),
+        reps: String(exercise?.reps ?? '10-12').slice(0, 40),
+        rest_seconds: Math.min(600, Math.max(0, Number(exercise?.rest_seconds) || 60)),
+        notes: exercise?.notes ? String(exercise.notes).slice(0, 300) : null,
+      })),
+    )
+    .slice(0, maxExercises);
 
-  if (!days.length || days.every((day: DayPlan) => day.exercises.length === 0)) {
+  if (!exercises.length) {
     throw new Error('A IA não retornou exercícios válidos.');
   }
 
-  return {
-    name: String(parsed?.name ?? 'Treino gerado por IA').slice(0, 80),
-    days,
-  };
+  const blockCount = Math.min(maxBlocks, Math.max(1, Math.floor(exercises.length / 3)));
+  const chunkSize = Math.ceil(exercises.length / blockCount);
+  const blocks: WorkoutBlock[] = [];
+
+  for (let blockIndex = 0; blockIndex < blockCount; blockIndex += 1) {
+    const chunk = exercises.slice(blockIndex * chunkSize, (blockIndex + 1) * chunkSize);
+    if (!chunk.length) continue;
+
+    const label = String.fromCharCode(65 + blockIndex);
+    const suggestedName = rawWorkouts[blockIndex]?.name;
+    const name = suggestedName
+      ? String(suggestedName).slice(0, 80)
+      : `${baseName} - Treino ${label}`;
+
+    blocks.push({
+      name,
+      day: { label, exercises: chunk },
+    });
+  }
+
+  if (!blocks.length) {
+    throw new Error('A IA não retornou blocos de treino válidos.');
+  }
+
+  return { name: baseName, blocks };
 }
 
 async function callProvider(settings: Settings, prompt: string) {
@@ -272,47 +304,62 @@ Deno.serve(async (req) => {
       return json({ error: 'Preencha objetivo, nível e local de treino.' }, 400);
     }
 
+    const maxBlocks = Math.min(7, Math.max(1, anamnesis.days_per_week));
     const prompt = [
-      'Gere um plano de treino personalizado com base nos dados abaixo.',
+      `Gere exatamente ${maxBlocks} treinos/blocos separados e personalizados com base nos dados abaixo.`,
+      `Cada bloco deve ter de 3 a 8 exercícios e representar uma sessão diferente. Nunca coloque todos os exercícios em um único treino.`,
+      'Retorne APENAS JSON no formato: {"name":"Plano ...","workouts":[{"name":"Treino A - ...","days":[{"label":"A","exercises":[{"name":"...","sets":3,"reps":"10-12","rest_seconds":60,"notes":"..."}]}]}]}.',
+      'Use labels A, B, C... e nomes diferentes para cada bloco.',
       'Use somente exercícios seguros e adequados ao histórico informado.',
-      `Dias por semana: ${anamnesis.days_per_week}.`,
       `Duração por sessão: ${anamnesis.session_minutes} minutos.`,
       JSON.stringify(anamnesis, null, 2),
     ].join('\n');
 
     const aiPayload = await callProvider(settings, prompt);
-    const plan = parsePlan(aiPayload);
+    const plan = parsePlan(aiPayload, maxBlocks);
 
-    const workouts = (await rest('workouts', {
-      method: 'POST',
-      body: JSON.stringify({
-        coach_id: user.id,
-        student_id: user.id,
-        name: plan.name,
-        status: 'active',
-        generated_by_ai: true,
-      }),
-    })) as { id: string }[];
-    const workoutId = workouts?.[0]?.id;
-    if (!workoutId) {
-      throw new Error('Não foi possível salvar o treino gerado.');
-    }
+    await rest(
+      `workouts?student_id=eq.${encodeURIComponent(user.id)}&coach_id=eq.${encodeURIComponent(user.id)}&generated_by_ai=eq.true&status=eq.active`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'archived' }),
+        headers: { Prefer: 'return=minimal' },
+      },
+    );
 
-    for (let dayIndex = 0; dayIndex < plan.days.length; dayIndex += 1) {
-      const day = plan.days[dayIndex];
+    const created: { id: string; name: string; exercises: number }[] = [];
+
+    for (const block of plan.blocks) {
+      const workouts = (await rest('workouts', {
+        method: 'POST',
+        body: JSON.stringify({
+          coach_id: user.id,
+          student_id: user.id,
+          name: block.name,
+          status: 'active',
+          generated_by_ai: true,
+        }),
+      })) as { id: string }[];
+      const workoutId = workouts?.[0]?.id;
+      if (!workoutId) {
+        throw new Error('Não foi possível salvar os treinos gerados.');
+      }
+
       const days = (await rest('workout_days', {
         method: 'POST',
         body: JSON.stringify({
           workout_id: workoutId,
-          label: day.label,
-          order_index: dayIndex,
+          label: block.day.label,
+          order_index: 0,
         }),
       })) as { id: string }[];
       const dayId = days?.[0]?.id;
-      if (!dayId) continue;
+      if (!dayId) {
+        throw new Error('Não foi possível salvar o bloco de treino.');
+      }
 
-      for (let exerciseIndex = 0; exerciseIndex < day.exercises.length; exerciseIndex += 1) {
-        const exercise = day.exercises[exerciseIndex];
+      for (let exerciseIndex = 0; exerciseIndex < block.day.exercises.length; exerciseIndex += 1) {
+        const exercise = block.day.exercises[exerciseIndex];
         await rest('workout_exercises', {
           method: 'POST',
           body: JSON.stringify({
@@ -327,6 +374,8 @@ Deno.serve(async (req) => {
           }),
         });
       }
+
+      created.push({ id: workoutId, name: block.name, exercises: block.day.exercises.length });
     }
 
     await rest(`profiles?id=eq.${encodeURIComponent(user.id)}`, {
@@ -338,7 +387,14 @@ Deno.serve(async (req) => {
       }),
     });
 
-    return json({ workoutId, name: plan.name, days: plan.days.length });
+    const workoutIds = created.map((workout) => workout.id);
+    return json({
+      workoutId: workoutIds[0],
+      workoutIds,
+      name: created[0]?.name ?? plan.name,
+      days: created.length,
+      workouts: created,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha ao gerar o treino.';
     return json({ error: message }, 500);

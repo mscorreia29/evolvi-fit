@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
 import { PhotoHero } from '@/components/ui/photo-hero';
 import { Screen } from '@/components/ui/screen';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Images } from '@/constants/images';
 import { Brand, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { generateAiMealPlan } from '@/lib/ai';
 import { formatDate } from '@/lib/format';
 import { getMealPlan, mealPlanCalories } from '@/lib/nutrition';
 import type { Meal, MealPlan } from '@/lib/types';
@@ -19,9 +22,15 @@ import { useAuth } from '@/providers/auth-provider';
 export default function StudentNutritionScreen() {
   const theme = useTheme();
   const { profile } = useAuth();
+  const isAutonomous = Boolean(
+    (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
+  );
   const [plan, setPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -41,6 +50,37 @@ export default function StudentNutritionScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  }
+
+  async function generatePlan() {
+    setGenerating(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const result = await generateAiMealPlan();
+      setNotice(`${result.title} criado com ${result.mealsCount} refeições.`);
+      await load();
+    } catch (generateError) {
+      setError(
+        generateError instanceof Error
+          ? generateError.message
+          : 'Não foi possível gerar seu plano alimentar.',
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function handleGeneratePlan() {
+    if (!plan) {
+      void generatePlan();
+      return;
+    }
+
+    Alert.alert('Gerar novo plano?', 'O plano atual será substituído pelo novo plano da IA.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Gerar', onPress: () => void generatePlan() },
+    ]);
   }
 
   if (loading) return <Loading label="Carregando plano alimentar..." />;
@@ -72,11 +112,32 @@ export default function StudentNutritionScreen() {
         ) : null}
       </PhotoHero>
 
+      {isAutonomous ? (
+        <Card style={[styles.aiCard, { borderColor: Brand.primary }]}>
+          <SectionHeader
+            title="Plano alimentar com IA"
+            subtitle="Crie um plano alimentar personalizado a partir da sua anamnese."
+          />
+          <Button
+            title={plan ? 'Gerar novo plano com IA' : 'Criar plano com IA'}
+            onPress={handleGeneratePlan}
+            loading={generating}
+            variant="secondary"
+          />
+          {notice ? <Text style={[styles.aiFeedback, { color: Brand.primary }]}>{notice}</Text> : null}
+          {error ? <Text style={[styles.aiFeedback, { color: Brand.danger }]}>{error}</Text> : null}
+        </Card>
+      ) : null}
+
       {!plan ? (
         <EmptyState
           icon="restaurant-outline"
           title="Plano alimentar em preparação"
-          message="Seu personal ainda não publicou um plano. Quando publicar, ele aparece aqui automaticamente."
+          message={
+            isAutonomous
+              ? 'Toque em “Criar plano com IA” para gerar seu plano alimentar agora.'
+              : 'Seu personal ainda não publicou um plano. Quando publicar, ele aparece aqui automaticamente.'
+          }
         />
       ) : (
         <>
@@ -220,6 +281,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
+  },
+  aiCard: {
+    borderWidth: 1,
+    gap: Spacing.two,
+  },
+  aiFeedback: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   notesCard: {
     borderWidth: 1,

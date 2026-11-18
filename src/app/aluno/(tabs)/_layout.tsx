@@ -5,10 +5,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function StudentTabsLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
+  const isAutonomous = Boolean(
+    (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
+  );
 
   const iconWrapper = (focused: boolean, icon: keyof typeof Ionicons.glyphMap, color: ColorValue) => (
     <View style={[styles.iconWrap, focused && { backgroundColor: theme.primarySoft }]}>
@@ -71,6 +76,7 @@ export default function StudentTabsLayout() {
         name="mensagens"
         options={{
           title: 'Chat',
+          href: isAutonomous ? null : undefined,
           tabBarIcon: ({ color, focused }) =>
             iconWrapper(focused, focused ? 'chatbubbles' : 'chatbubbles-outline', color),
         }}

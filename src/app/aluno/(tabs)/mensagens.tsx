@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { Redirect, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
@@ -26,6 +26,9 @@ import { useAuth } from '@/providers/auth-provider';
 export default function StudentMessagesScreen() {
   const theme = useTheme();
   const { profile } = useAuth();
+  const isAutonomous = Boolean(
+    (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
+  );
   const [coachId, setCoachId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
@@ -87,6 +90,10 @@ export default function StudentMessagesScreen() {
     }
     await load();
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+  }
+
+  if (isAutonomous) {
+    return <Redirect href={'/aluno/suporte' as never} />;
   }
 
   if (!loading && !coachId) {
