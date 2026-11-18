@@ -17,10 +17,16 @@ import { useTheme } from '@/hooks/use-theme';
 import { generateAiMealPlan, saveAiMealPreferences } from '@/lib/ai';
 import { formatDate } from '@/lib/format';
 import { getMealPlan, mealPlanCalories } from '@/lib/nutrition';
-import type { AiMealPreferences, Meal, MealPlan } from '@/lib/types';
+import type { AiMealPreferences, Meal, MealPlan, Profile } from '@/lib/types';
 import { useAuth } from '@/providers/auth-provider';
 
 type MealPreferenceKey = 'breakfast' | 'snack' | 'lunch' | 'dinner' | 'fruits';
+
+type MealPlanInput = {
+  favoriteFoods: string;
+  mealRoutine: string;
+  mealPreferences: AiMealPreferences;
+};
 
 const MEAL_PREFERENCE_FIELDS: {
   key: MealPreferenceKey;
@@ -44,9 +50,32 @@ function buildFavoriteFoods(preferences: AiMealPreferences) {
     .join(' | ');
 }
 
+function getSavedMealInput(profile: Profile | null): MealPlanInput | null {
+  const saved = profile?.ai_meal_preferences;
+  const mealPreferences: AiMealPreferences = {
+    breakfast: saved?.breakfast ?? '',
+    snack: saved?.snack ?? '',
+    lunch: saved?.lunch ?? '',
+    dinner: saved?.dinner ?? '',
+    fruits: saved?.fruits ?? '',
+    routine: saved?.routine ?? profile?.ai_meal_routine ?? '',
+  };
+  const hasStructured = MEAL_PREFERENCE_FIELDS.some(
+    (field) => (mealPreferences[field.key] ?? '').length >= 3,
+  );
+  const legacyFoods = profile?.ai_meal_favorite_foods?.trim() ?? '';
+  if (!hasStructured && !legacyFoods) return null;
+
+  return {
+    favoriteFoods: hasStructured ? buildFavoriteFoods(mealPreferences) : legacyFoods,
+    mealRoutine: mealPreferences.routine ?? '',
+    mealPreferences,
+  };
+}
+
 export default function StudentNutritionScreen() {
   const theme = useTheme();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const isAutonomous = Boolean(
     (profile as unknown as { is_autonomous?: boolean } | null)?.is_autonomous,
   );
@@ -91,11 +120,7 @@ export default function StudentNutritionScreen() {
     setRefreshing(false);
   }
 
-  async function generatePlan(input: {
-    favoriteFoods: string;
-    mealRoutine: string;
-    mealPreferences: AiMealPreferences;
-  }) {
+  async function generatePlan(input: MealPlanInput) {
     setGenerating(true);
     setNotice(null);
     setError(null);
@@ -103,6 +128,7 @@ export default function StudentNutritionScreen() {
       const result = await generateAiMealPlan(input);
       setNotice(`${result.title} criado com ${result.mealsCount} refeições.`);
       await load();
+      await refreshProfile();
       return true;
     } catch (generateError) {
       setError(
@@ -116,11 +142,7 @@ export default function StudentNutritionScreen() {
     }
   }
 
-  async function savePreferences(input: {
-    favoriteFoods: string;
-    mealRoutine: string;
-    mealPreferences: AiMealPreferences;
-  }) {
+  async function savePreferences(input: MealPlanInput) {
     if (!profile) return false;
     setSavingForm(true);
     setNotice(null);
@@ -133,6 +155,7 @@ export default function StudentNutritionScreen() {
         input.mealPreferences,
       );
       setNotice('Ficha por refeição salva. Seu plano atual foi mantido.');
+      await refreshProfile();
       return true;
     } catch (saveError) {
       setError(
@@ -161,7 +184,12 @@ export default function StudentNutritionScreen() {
     setShowForm(true);
   }
 
-  function handleGeneratePlan() {
+  async function handleGeneratePlan() {
+    const saved = getSavedMealInput(profile);
+    if (saved) {
+      await generatePlan(saved);
+      return;
+    }
     openForm('generate');
   }
 
@@ -230,11 +258,11 @@ export default function StudentNutritionScreen() {
         <Card style={[styles.aiCard, { borderColor: Brand.primary }]}>
           <SectionHeader
             title="Plano alimentar com IA"
-            subtitle="Monte sua ficha por refeição: gere um novo plano ou salve só as respostas."
+            subtitle="Gera o plano usando a ficha salva. Se ainda não houver ficha, ela será aberta."
           />
           <Button
             title={plan ? 'Gerar novo plano com IA' : 'Criar plano com IA'}
-            onPress={handleGeneratePlan}
+            onPress={() => void handleGeneratePlan()}
             loading={generating}
             variant="secondary"
           />
