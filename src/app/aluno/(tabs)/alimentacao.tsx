@@ -102,7 +102,9 @@ export default function StudentNutritionScreen() {
           <View style={styles.heroStats}>
             <View style={styles.heroPill}>
               <Ionicons name="flame" size={14} color="#FFFFFF" />
-              <Text style={styles.heroPillText}>{totalCalories} kcal</Text>
+              <Text style={styles.heroPillText}>
+                {totalCalories} {plan.ai_generated ? 'kcal/refeição' : 'kcal'}
+              </Text>
             </View>
             <View style={styles.heroPill}>
               <Ionicons name="time" size={14} color="#FFFFFF" />
@@ -162,6 +164,7 @@ export default function StudentNutritionScreen() {
             <MealCard
               key={meal.id}
               meal={meal}
+              aiGenerated={Boolean(plan.ai_generated)}
               expanded={expandedMeal === meal.id}
               onToggle={() => setExpandedMeal((current) => (current === meal.id ? null : meal.id))}
             />
@@ -174,15 +177,19 @@ export default function StudentNutritionScreen() {
 
 function MealCard({
   meal,
+  aiGenerated,
   expanded,
   onToggle,
 }: {
   meal: Meal;
+  aiGenerated: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const theme = useTheme();
-  const calories = meal.items.reduce((sum, item) => sum + (Number(item.calories) || 0), 0);
+  const totalCalories = meal.items.reduce((sum, item) => sum + (Number(item.calories) || 0), 0);
+  const calories =
+    aiGenerated && meal.items.length > 0 ? Math.round(totalCalories / meal.items.length) : totalCalories;
 
   return (
     <Card style={styles.mealCard}>
@@ -193,7 +200,11 @@ function MealCard({
         <View style={styles.mealInfo}>
           <Text style={[styles.mealName, { color: theme.text }]}>{meal.name}</Text>
           <Text style={[styles.mealMeta, { color: theme.textSecondary }]}>
-            {[meal.time, `${meal.items.length} alimento(s)`, calories ? `${calories} kcal` : null]
+            {[
+              meal.time,
+              `${meal.items.length} ${aiGenerated ? 'opção(ões)' : 'alimento(s)'}`,
+              calories ? (aiGenerated ? `~${calories} kcal/opção` : `${calories} kcal`) : null,
+            ]
               .filter(Boolean)
               .join(' • ')}
           </Text>

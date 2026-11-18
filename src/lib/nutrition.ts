@@ -5,8 +5,18 @@ export function createLocalId() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function mealPlanCalories(plan: Pick<MealPlan, 'meals'> | null | undefined) {
-  if (!plan) return 0;
+export function mealPlanCalories(plan: Pick<MealPlan, 'meals' | 'ai_generated'> | null | undefined) {
+  if (!plan || plan.meals.length === 0) return 0;
+
+  if (plan.ai_generated) {
+    const perMeal = plan.meals.map((meal) =>
+      meal.items.length > 0
+        ? meal.items.reduce((sum, item) => sum + (Number(item.calories) || 0), 0) /
+          meal.items.length
+        : 0,
+    );
+    return Math.round(perMeal.reduce((sum, value) => sum + value, 0) / perMeal.length);
+  }
 
   return plan.meals.reduce(
     (total, meal) =>
@@ -68,6 +78,7 @@ export async function saveMealPlan(input: {
         student_id: input.studentId,
         title: input.title.trim() || 'Plano alimentar',
         notes: input.notes.trim() || null,
+        ai_generated: false,
         meals: normalizeMeals(input.meals),
         updated_at: new Date().toISOString(),
       },

@@ -256,6 +256,7 @@ export type MealPlan = {
   student_id: string;
   title: string;
   notes: string | null;
+  ai_generated?: boolean;
   meals: Meal[];
   created_at: string;
   updated_at: string;
