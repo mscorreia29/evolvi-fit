@@ -122,7 +122,14 @@ export async function generateAiWorkout(payload: AutonomousAnamnesis) {
   });
 
   if (error) {
-    throw new Error(error.message || 'Falha ao chamar o serviço de IA.');
+    const context = (error as { context?: { json?: () => Promise<unknown> } }).context;
+    let detail = error.message || 'Falha ao chamar o serviço de IA.';
+    try {
+      const body = (await context?.json?.()) as { error?: string; message?: string } | undefined;
+      if (body?.error) detail = body.error;
+      else if (body?.message) detail = body.message;
+    } catch {}
+    throw new Error(detail);
   }
 
   const result = data as { error?: string; workoutId?: string; name?: string; days?: number } | null;

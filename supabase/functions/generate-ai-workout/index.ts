@@ -153,30 +153,37 @@ async function callProvider(settings: Settings, prompt: string) {
     return payload;
   }
 
-  const model = settings.model?.trim() || 'gemini-2.5-flash';
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: 'POST',
-      headers: {
-        'x-goog-api-key': key,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: settings.prompt_base }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          responseMimeType: 'application/json',
+  const configuredModel = settings.model?.trim() || 'gemini-3.1-flash-lite';
+  const models = [...new Set([configuredModel, 'gemini-3.1-flash-lite'])];
+  let lastError: Error | null = null;
+
+  for (const model of models) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': key,
+          'Content-Type': 'application/json',
         },
-      }),
-    },
-  );
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload?.error?.message ?? `Gemini ${response.status}`);
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: settings.prompt_base }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            responseMimeType: 'application/json',
+          },
+        }),
+      },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok) return payload;
+
+    lastError = new Error(payload?.error?.message ?? `Gemini ${response.status}`);
+    if (response.status !== 404 && response.status !== 503) throw lastError;
   }
-  return payload;
+
+  throw lastError ?? new Error('Gemini indisponível.');
 }
 
 Deno.serve(async (req) => {

@@ -21,7 +21,7 @@ import { useAuth } from '@/providers/auth-provider';
 
 export default function AnamneseAiScreen() {
   const router = useRouter();
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, signOut } = useAuth();
 
   const [fullName, setFullName] = useState(
     profile?.full_name ?? session?.user.user_metadata?.full_name ?? '',
@@ -144,6 +144,10 @@ export default function AnamneseAiScreen() {
             <Text style={styles.heroTitle}>Anamnese com IA</Text>
             <Text style={styles.heroSub}>Seus dados viram um treino personalizado</Text>
           </View>
+          <Pressable onPress={() => void signOut()} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={17} color="#FFFFFF" />
+            <Text style={styles.logoutText}>Sair</Text>
+          </Pressable>
         </View>
       </PhotoHero>
 
@@ -292,6 +296,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logoutBtn: {
+    minHeight: 36,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  logoutText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   row: {
     flexDirection: 'row',
